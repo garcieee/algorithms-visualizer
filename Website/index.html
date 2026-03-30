@@ -3,528 +3,267 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🚀 Algorithm Adventure!</title>
+<title>AlgoKit — Algorithm Analysis Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <!-- ═══════════════════════════════════════════════════════════════════
-     HEADER
+     TOP HEADER
      ═══════════════════════════════════════════════════════════════════ -->
-<header id="site-header">
-  <div class="header-title">🚀 Algorithm Adventure!</div>
-  <div class="header-sub">Sorting · MST · Recursion · Data Structures — the fun way! ✨</div>
+<header id="header">
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-icon">&lt;/&gt;</div>
+    AlgoKit
+  </div>
+  <div style="font-size:.72rem;color:var(--muted);font-family:var(--mono);margin-left:-18px">v1.0</div>
+
+  <!-- Divider -->
+  <div style="width:1px;height:24px;background:var(--border);flex-shrink:0"></div>
+
+  <!-- Section tabs -->
+  <div class="section-tabs">
+    <button class="section-tab active" data-section="sort">Sorting Algorithms</button>
+    <button class="section-tab"        data-section="mst">MST Algorithms</button>
+    <button class="section-tab"        data-section="rec">Recursion Simulation</button>
+  </div>
+
+  <!-- Active algo label -->
+  <div style="font-family:var(--mono);font-size:.8rem;color:var(--muted);white-space:nowrap">
+    <span style="color:var(--muted2)">›</span>
+    <span id="algo-display" style="color:var(--text);margin-left:4px">Bubble Sort</span>
+  </div>
+
+  <!-- Step badge -->
+  <div class="step-badge" id="step-badge">Steps <span>0</span></div>
+
+  <!-- Playback controls -->
+  <div class="playback-controls">
+    <button class="ctrl-btn" id="gen-btn"   data-tip="Generate new data">↺</button>
+    <button class="ctrl-btn" id="step-btn"  data-tip="Step once">▷</button>
+    <button class="ctrl-btn primary" id="run-btn">▶ Run</button>
+    <button class="ctrl-btn" id="reset-btn" data-tip="Reset">⏹</button>
+  </div>
+
 </header>
 
 <!-- ═══════════════════════════════════════════════════════════════════
-     NAV — menu-driven interface (spec requirement)
+     MAIN LAYOUT
      ═══════════════════════════════════════════════════════════════════ -->
-<nav id="main-nav">
-  <button class="nav-btn active" data-tab="sort"  onclick="switchTab('sort')">🔀 Sorting</button>
-  <button class="nav-btn"        data-tab="mst"   onclick="switchTab('mst')">🌳 MST</button>
-  <button class="nav-btn"        data-tab="rec"   onclick="switchTab('rec')">🪄 Recursion</button>
-  <button class="nav-btn"        data-tab="ds"    onclick="switchTab('ds')">📚 Data Structures</button>
-</nav>
+<div id="main">
 
-<!-- ═══════════════════════════════════════════════════════════════════
-     PART 1 — SORTING ALGORITHM COMPARISON
-     ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-sort" class="section active">
-  <div class="section-title">🔀 Sorting Algorithm Comparison</div>
-  <div class="section-sub">Compare all 8 algorithms on the same dataset • Default size: 1000 ⭐</div>
+  <!-- ── LEFT SIDEBAR ─────────────────────────────────────────────── -->
+  <aside id="sidebar">
 
-  <!-- Algorithm Info Accordion -->
-  <div class="card">
-    <div class="card-title">📖 Algorithm Explanations &amp; Complexity</div>
-    <div class="accordion-group">
-      <div class="accordion">
-        <div class="accordion-header">🫧 Bubble Sort — O(n²) avg · O(n) best · O(1) space <span>▼</span></div>
-        <div class="accordion-body">
-          Repeatedly compares adjacent pairs and swaps them if out of order. Each pass "bubbles" the largest unsorted element to the end.
-          <strong>Early-exit optimization:</strong> stops immediately when a full pass makes zero swaps — meaning the array is already sorted.
-          <table><tr><th>Case</th><th>Time</th><th>When</th></tr>
-            <tr><td>Best</td><td>O(n)</td><td>Already sorted (early exit fires)</td></tr>
-            <tr><td>Average</td><td>O(n²)</td><td>Random input</td></tr>
-            <tr><td>Worst</td><td>O(n²)</td><td>Reverse sorted</td></tr>
-          </table>
-          <p style="margin-top:8px"><strong>Data Structure:</strong> In-place array. Two index variables j and j+1 walk the array.</p>
-        </div>
-      </div>
-      <div class="accordion">
-        <div class="accordion-header">🎯 Selection Sort — O(n²) all cases · O(1) space <span>▼</span></div>
-        <div class="accordion-body">
-          Each pass scans the entire unsorted portion to find the minimum element, then places it at the start.
-          Always makes exactly n-1 swaps regardless of input — good when swaps are expensive.
-          <p style="margin-top:8px"><strong>Data Structure:</strong> In-place array. One index pointer tracks the current minimum.</p>
-        </div>
-      </div>
-      <div class="accordion">
-        <div class="accordion-header">📌 Insertion Sort — O(n²) avg · O(n) best · O(1) space <span>▼</span></div>
-        <div class="accordion-body">
-          Like sorting a hand of playing cards: pick each element and insert it into the correct position in the already-sorted prefix.
-          Very efficient on nearly-sorted data. Stable sort (equal elements keep their original order).
-          <p style="margin-top:8px"><strong>Data Structure:</strong> In-place array. A "key" variable holds the current element being inserted.</p>
-        </div>
-      </div>
-      <div class="accordion">
-        <div class="accordion-header">🔀 Merge Sort — O(n log n) all cases · O(n) space <span>▼</span></div>
-        <div class="accordion-body">
-          Divide-and-conquer: recursively split the array in half, sort each half, then merge the two sorted halves.
-          Guaranteed O(n log n) on all inputs. Stable sort. Uses auxiliary arrays for merging.
-          <p style="margin-top:8px"><strong>Data Structure:</strong> Auxiliary arrays for each merge step. Recursion call stack O(log n) deep.</p>
-        </div>
-      </div>
-      <div class="accordion">
-        <div class="accordion-header">⚡ Quick Sort — O(n log n) avg · O(n²) worst · O(log n) space <span>▼</span></div>
-        <div class="accordion-body">
-          Picks a pivot, partitions elements so everything ≤ pivot is on the left and > pivot on the right, then recursively sorts both sides.
-          Worst case O(n²) occurs when pivot always picks the min or max (e.g., on sorted input with last-element pivot).
-          <p style="margin-top:8px"><strong>Data Structure:</strong> In-place array partitioning. Two index pointers i and j.</p>
-        </div>
-      </div>
-      <div class="accordion">
-        <div class="accordion-header">🎰 Randomized Quick Sort — O(n log n) avg · O(log n) space <span>▼</span></div>
-        <div class="accordion-body">
-          Same as Quick Sort but chooses the pivot randomly before partitioning.
-          This eliminates the worst-case on sorted/reverse-sorted input — the probability of hitting O(n²) becomes astronomically small.
-          <p style="margin-top:8px"><strong>Data Structure:</strong> Same as Quick Sort. Random pivot is swapped to the end before partitioning.</p>
-        </div>
-      </div>
-      <div class="accordion">
-        <div class="accordion-header">🔢 Counting Sort — O(n+k) · O(k) space · Non-comparison <span>▼</span></div>
-        <div class="accordion-body">
-          Counts how many times each value appears, then reconstructs the sorted array. Not comparison-based — breaks the O(n log n) lower bound.
-          Only works on non-negative integers. k = max value in the input.
-          <p style="margin-top:8px"><strong>Data Structure:</strong> Count array (frequency table) of size k. Rebuilt output array.</p>
-        </div>
-      </div>
-      <div class="accordion">
-        <div class="accordion-header">📻 Radix Sort — O(nk) · O(n+k) space · Non-comparison <span>▼</span></div>
-        <div class="accordion-body">
-          Sorts by digit position, from least significant to most significant (LSD). Each digit pass uses counting/bucket sort.
-          k = number of digits in the maximum value.
-          <p style="margin-top:8px"><strong>Data Structure:</strong> 10 buckets (one per digit 0-9). Array rebuilt after each digit pass.</p>
-        </div>
+    <!-- Algorithm List -->
+    <div class="sidebar-section" style="flex:1;overflow-y:auto">
+      <div class="sidebar-label">Algorithms</div>
+      <div class="algo-list" id="algo-list">
+        <!-- Populated by JS -->
       </div>
     </div>
-  </div>
 
-  <!-- Setup -->
-  <div class="card">
-    <div class="card-title">⚙️ Configure Your Race</div>
-    <div class="controls">
-      <div class="ctrl-group">
-        <label>📏 Dataset Size</label>
-        <select id="sort-size">
-          <option value="20">20 — Tiny</option>
-          <option value="50">50 — Small</option>
-          <option value="100">100 — Medium</option>
-          <option value="500">500 — Large</option>
-          <option value="1000" selected>1000 — Spec Default ⭐</option>
-          <option value="2000">2000 — Huge</option>
-          <option value="5000">5000 — Monster</option>
+    <!-- Settings -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Settings</div>
+
+      <div class="control-row">
+        <div class="ctrl-label">
+          Dataset Size <span id="size-display">60</span>
+        </div>
+        <input type="range" id="size-slider" min="10" max="200" value="60">
+      </div>
+
+      <div class="control-row">
+        <div class="ctrl-label">
+          Speed <span id="speed-display">5</span>
+        </div>
+        <input type="range" id="speed-slider" min="1" max="10" value="5">
+      </div>
+
+      <div class="control-row">
+        <div class="ctrl-label">Input Type</div>
+        <select class="ctrl-select" id="dataset-select">
+          <option value="random">Random</option>
+          <option value="sorted">Nearly Sorted</option>
+          <option value="reversed">Reversed</option>
+          <option value="nearly">Mostly Sorted</option>
         </select>
       </div>
-      <div class="ctrl-group">
-        <label>🎲 Input Type</label>
-        <select id="sort-dtype">
-          <option value="random">Random 🎲</option>
-          <option value="sorted">Already Sorted 📈 (best case)</option>
-          <option value="reversed">Reversed 📉 (worst case)</option>
-          <option value="custom">Custom Input ✏️</option>
+
+      <!-- Prim start node (MST only) -->
+      <div class="control-row" id="prim-start-wrap" style="display:none">
+        <div class="ctrl-label">Prim's Start Node</div>
+        <select class="ctrl-select" id="prim-start-select">
+          <option value="0">0</option>
         </select>
       </div>
-      <div class="ctrl-group" id="custom-input-wrap" style="display:none">
-        <label>✏️ Your Numbers (comma-separated)</label>
-        <input type="text" id="custom-nums" placeholder="e.g. 9, 3, 7, 1, 5" style="width:230px">
+
+      <!-- B input (Rec only) -->
+      <div class="control-row" id="rec-b-wrap" style="display:none">
+        <div class="ctrl-label"><span id="rec-b-label">b value:</span></div>
+        <input type="number" id="rec-b-input" value="18" min="0" max="999"
+               style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.8rem;padding:6px 10px;border-radius:6px;outline:none">
+      </div>
+
+      <div class="action-btns">
+        <button class="action-btn generate" id="gen-btn2"
+                onclick="document.getElementById('gen-btn').click()">↺ Generate</button>
+        <button class="action-btn" onclick="document.getElementById('reset-btn').click()">⏹ Reset</button>
       </div>
     </div>
 
-    <label style="margin-bottom:7px;display:block">🏁 Select Algorithms to Race</label>
-    <div class="check-group" id="algo-checks">
-      <label class="check-label checked"><input type="checkbox" value="bubble"    checked>🫧 Bubble</label>
-      <label class="check-label checked"><input type="checkbox" value="selection" checked>🎯 Selection</label>
-      <label class="check-label checked"><input type="checkbox" value="insertion" checked>📌 Insertion</label>
-      <label class="check-label checked"><input type="checkbox" value="merge"     checked>🔀 Merge</label>
-      <label class="check-label checked"><input type="checkbox" value="quick"     checked>⚡ Quick</label>
-      <label class="check-label checked"><input type="checkbox" value="rquick"    checked>🎰 Random-Quick</label>
-      <label class="check-label checked"><input type="checkbox" value="counting"  checked>🔢 Counting</label>
-      <label class="check-label checked"><input type="checkbox" value="radix"     checked>📻 Radix</label>
-    </div>
-
-    <div class="controls" style="margin-top:14px">
-      <button class="btn btn-coral"  onclick="SortModule.runBenchmark()">🏁 Run the Race!</button>
-      <button class="btn btn-ghost"  onclick="SortModule.generateData()">🎲 New Data</button>
-    </div>
-  </div>
-
-  <!-- Live Visualizer -->
-  <div class="card">
-    <div class="card-title">
-      🎬 Live Step-by-Step Visualizer
-      <span class="tag" id="vis-algo-label">Bubble Sort</span>
-    </div>
-    <div class="controls">
-      <div class="ctrl-group">
-        <label>👁️ Watch Algorithm</label>
-        <select id="vis-algo">
-          <option value="bubble">🫧 Bubble Sort</option>
-          <option value="selection">🎯 Selection Sort</option>
-          <option value="insertion">📌 Insertion Sort</option>
-          <option value="merge">🔀 Merge Sort</option>
-          <option value="quick">⚡ Quick Sort</option>
-          <option value="rquick">🎰 Random-Quick Sort</option>
-          <option value="counting">🔢 Counting Sort</option>
-          <option value="radix">📻 Radix Sort</option>
-        </select>
-      </div>
-      <div class="ctrl-group">
-        <label>🎚️ Bar Count</label>
-        <select id="vis-size">
-          <option value="20">20 bars</option>
-          <option value="30" selected>30 bars</option>
-          <option value="50">50 bars</option>
-          <option value="80">80 bars</option>
-        </select>
-      </div>
-      <div class="ctrl-group speed-row">
-        <label>🐢 Speed 🐇</label>
-        <input type="range" id="vis-speed" min="1" max="5" value="3">
+    <!-- Complexity -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Complexity</div>
+      <div class="complexity-grid">
+        <div class="complexity-card">
+          <div class="complexity-label">Best</div>
+          <div class="complexity-value green" id="cx-best">O(n)</div>
+        </div>
+        <div class="complexity-card">
+          <div class="complexity-label">Average</div>
+          <div class="complexity-value red" id="cx-avg">O(n²)</div>
+        </div>
+        <div class="complexity-card">
+          <div class="complexity-label">Worst</div>
+          <div class="complexity-value red" id="cx-worst">O(n²)</div>
+        </div>
+        <div class="complexity-card">
+          <div class="complexity-label">Space</div>
+          <div class="complexity-value green" id="cx-space">O(1)</div>
+        </div>
+        <div class="complexity-card" style="grid-column:span 2">
+          <div class="complexity-label">Stable?</div>
+          <div class="complexity-value green" id="cx-stable">Yes</div>
+        </div>
       </div>
     </div>
 
-    <div class="progress-wrap"><div class="progress-bar" id="sort-progress" style="width:0%"></div></div>
-    <div id="sort-canvas-wrap"><canvas id="sort-canvas"></canvas></div>
+  </aside>
 
-    <div class="stat-row">
-      <div class="stat-box" data-tip="Number of element comparisons"><div class="stat-label">⚔️ Comparisons</div><div class="stat-value" id="stat-comps">0</div></div>
-      <div class="stat-box" data-tip="Number of element swaps"><div class="stat-label">🔄 Swaps</div><div class="stat-value" id="stat-swaps">0</div></div>
-      <div class="stat-box" data-tip="Wall-clock time in milliseconds"><div class="stat-label">⏱️ Time (ms)</div><div class="stat-value" id="stat-time">0</div></div>
-      <div class="stat-box"><div class="stat-label">✅ Done?</div><div class="stat-value" id="stat-done">—</div></div>
-    </div>
-    <div class="controls">
-      <button class="btn btn-green"  id="vis-play-btn" onclick="SortModule.toggleVis()">▶️ Play</button>
-      <button class="btn btn-ghost"  onclick="SortModule.resetVisualizer()">🔄 Reset</button>
-      <span   class="step-badge"    id="step-badge">Ready!</span>
-    </div>
-  </div>
+  <!-- ── CENTER CANVAS ────────────────────────────────────────────── -->
+  <div id="center">
 
-  <!-- Benchmark Results -->
-  <div class="card" id="sort-results-card" style="display:none">
-    <div class="card-title">🏆 Race Results</div>
-    <div style="font-size:.88rem;font-weight:700;color:var(--muted);margin-bottom:10px">
-      Dataset Size: <strong id="results-size">1000</strong>
+    <!-- MST overlay controls -->
+    <div id="mst-controls-overlay" style="display:none">
+      <button class="mst-ctrl-btn" id="mst-random-btn">⊞ Random Graph</button>
+      <button class="mst-ctrl-btn" id="mst-reset-btn2">↺ Reset Edges</button>
+      <button class="mst-ctrl-btn" id="mst-clear-btn">✕ Clear All</button>
+      <span style="font-family:var(--mono);font-size:.72rem;color:var(--muted);align-self:center;margin-left:4px">
+        Click empty space to add node · Click two nodes to connect
+      </span>
     </div>
-    <div style="font-size:.85rem;font-weight:700;color:#16A34A;margin-bottom:12px" id="sorted-preview"></div>
-    <div class="progress-wrap"><div class="progress-bar" id="bench-progress" style="width:0%"></div></div>
-    <div style="overflow-x:auto">
-      <table class="results-table">
-        <thead><tr>
-          <th>#</th><th>Algorithm</th><th>⏱️ Time (ms)</th>
-          <th>⚔️ Comparisons</th><th>🔄 Swaps</th><th>Speed Bar</th>
-        </tr></thead>
-        <tbody id="results-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-</section>
 
-<!-- ═══════════════════════════════════════════════════════════════════
-     PART 2 — MST
-     ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-mst" class="section">
-  <div class="section-title">🌳 Minimum Spanning Tree</div>
-  <div class="section-sub">Build an MST step-by-step with Kruskal's or Prim's • Click canvas to add nodes</div>
+    <!-- Main canvas area -->
+    <div id="canvas-area">
+      <!-- Sorting bars canvas -->
+      <canvas id="sort-canvas"></canvas>
 
-  <div class="card">
-    <div class="card-title">📖 Algorithm Explanations</div>
-    <div class="two-col">
-      <div class="ds-info">
-        <h3>🔑 Kruskal's Algorithm</h3>
-        <strong>Strategy:</strong> Sort all edges by weight. Add the cheapest edge that doesn't form a cycle.<br><br>
-        <strong>Data Structures:</strong><br>
-        • <code>Edge List</code> — sorted by weight O(E log E)<br>
-        • <code>Union-Find</code> — O(α(n)) cycle detection<br><br>
-        <strong>Time:</strong> O(E log E) · <strong>Space:</strong> O(V)
-      </div>
-      <div class="ds-info">
-        <h3>🌱 Prim's Algorithm</h3>
-        <strong>Strategy:</strong> Start at one node. Grow the MST by always picking the cheapest edge connecting a visited node to an unvisited one.<br><br>
-        <strong>Data Structures:</strong><br>
-        • <code>Adjacency List</code> — O(V+E) space<br>
-        • <code>Min-Heap</code> — O(log V) extraction<br><br>
-        <strong>Time:</strong> O(E log V) · <strong>Space:</strong> O(V+E)
+      <!-- MST graph canvas -->
+      <canvas id="mst-canvas"></canvas>
+
+      <!-- Recursion call tree -->
+      <div id="rec-output" style="display:none;position:absolute;inset:0;flex-direction:column;overflow:hidden">
+        <div class="rec-trace" id="rec-trace">
+          <span style="color:var(--muted);font-family:var(--mono)">Choose a function and click ▶ Run…</span>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">🖱️ Build Your Graph</div>
-    <div class="controls">
-      <div class="ctrl-group">
-        <label>🔧 Algorithm</label>
-        <select id="mst-algo">
-          <option value="kruskal">🔑 Kruskal's</option>
-          <option value="prim">🌱 Prim's</option>
-        </select>
+    <!-- Status bar -->
+    <div id="status-bar">
+      <div class="status-item">
+        <div class="status-dot" id="status-dot"></div>
+        <span class="status-msg" id="status-msg">Ready</span>
       </div>
-      <div class="ctrl-group">
-        <label>🏁 Prim's Start Node</label>
-        <select id="prim-start" style="width:80px"><option>0</option></select>
-      </div>
-      <div class="ctrl-group speed-row">
-        <label>⏩ Speed</label>
-        <input type="range" id="mst-speed" min="1" max="5" value="3" style="width:90px">
+      <div class="status-item" style="margin-left:auto">
+        <span style="font-family:var(--mono);font-size:.72rem;color:var(--muted)">AlgoKit v1.0 &nbsp;·&nbsp; Algorithms &amp; Complexity &nbsp;·&nbsp; Term 2, SY 2025–2026</span>
       </div>
     </div>
-    <div class="controls">
-      <button class="btn btn-mint"    onclick="MSTModule.addRandomGraph(6)">🎲 Random (6 nodes)</button>
-      <button class="btn btn-sky"     onclick="MSTModule.addRandomGraph(8)">🎲 Random (8 nodes)</button>
-      <button class="btn btn-ghost"   onclick="MSTModule.clearMST()">🗑️ Clear</button>
-      <button class="btn btn-coral"   id="mst-run-btn"   onclick="MSTModule.runMST()">🌳 Build MST!</button>
-      <button class="btn btn-yellow"  id="mst-step-btn"  onclick="MSTModule.stepMST()" style="display:none">👣 Next Step</button>
-      <button class="btn btn-ghost"   id="mst-reset-btn" onclick="MSTModule.resetMSTRun()" style="display:none">🔄 Reset</button>
-    </div>
-    <p style="font-size:.82rem;color:var(--muted);font-weight:600;margin-bottom:9px">
-      💡 <b>Click empty space</b> to add a node &nbsp;|&nbsp; <b>Click two nodes</b> to add an edge &nbsp;|&nbsp; Edge weights are auto-assigned
-    </p>
-    <canvas id="mst-canvas" width="700" height="380"></canvas>
-    <div class="mst-legend">
-      <div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:#4ECDC4"></div> MST Edge</div>
-      <div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:#FF6B6B"></div> Considering</div>
-      <div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:#FCA5A5"></div> Rejected (cycle)</div>
-      <div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:#4ECDC4;border-radius:3px"></div> Visited Node</div>
-      <div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:#A855F7"></div> Start Node (Prim's)</div>
-    </div>
+
   </div>
 
-  <div class="card" id="mst-output-card" style="display:none">
-    <div class="card-title">
-      📋 Simulation Output
-      <span class="tag" id="mst-algo-label">Kruskal's</span>
-    </div>
-    <div class="two-col">
-      <div>
-        <div style="font-weight:700;margin-bottom:7px;font-size:.9rem">📝 Step-by-Step Log:</div>
-        <div class="output-box" id="mst-log" style="height:210px"></div>
-      </div>
-      <div>
-        <div style="font-weight:700;margin-bottom:7px;font-size:.9rem">✅ Final MST Result:</div>
-        <div class="output-box" id="mst-result" style="height:210px"></div>
+  <!-- ── RIGHT PANEL ───────────────────────────────────────────────── -->
+  <aside id="right-panel">
+
+    <!-- Metrics grid -->
+    <div style="padding:14px 14px 6px;flex-shrink:0">
+      <div style="font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        Profiler
+        <span style="flex:1;height:1px;background:var(--border)"></span>
       </div>
     </div>
-    <div class="stat-row" style="margin-top:12px">
-      <div class="stat-box"><div class="stat-label">💰 Total MST Cost</div><div class="stat-value" id="mst-cost">—</div></div>
-      <div class="stat-box"><div class="stat-label">🔗 Edges in MST</div><div class="stat-value" id="mst-edge-count">—</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════
-     PART 3 — RECURSION
-     ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-rec" class="section">
-  <div class="section-title">🪄 Recursive Function Simulation</div>
-  <div class="section-sub">Watch function calls appear one by one — base cases, return values, and all!</div>
-
-  <div class="card">
-    <div class="card-title">📖 How Recursion Works</div>
-    <div class="two-col">
-      <div class="ds-info">
-        <h3>🔑 Key Concepts</h3>
-        Every recursive function needs:<br>
-        • <code>Base Case</code> — stops the recursion<br>
-        • <code>Recursive Case</code> — reduces toward the base<br><br>
-        <strong>Data Structure:</strong> The <strong>Call Stack</strong> — a LIFO stack of function frames. Each call <em>pushes</em> a frame; each return <em>pops</em> it.
+    <div class="metric-grid">
+      <div class="metric-card cyan">
+        <div class="metric-label">Time</div>
+        <div class="metric-value" id="m-time">0 ms</div>
+        <div class="metric-sub">elapsed</div>
       </div>
-      <div class="ds-info">
-        <h3>📊 Complexity Comparison</h3>
-        <table style="width:100%;font-size:.85rem">
-          <tr><th>Function</th><th>Calls</th><th>Depth</th></tr>
-          <tr><td>Factorial(n)</td><td>O(n)</td><td>O(n)</td></tr>
-          <tr><td>Fib naive(n)</td><td>O(2ⁿ)</td><td>O(n)</td></tr>
-          <tr><td>Fib memo(n)</td><td>O(n)</td><td>O(n)</td></tr>
-          <tr><td>Hanoi(n)</td><td>O(2ⁿ)</td><td>O(n)</td></tr>
-          <tr><td>GCD(a,b)</td><td>O(log n)</td><td>O(log n)</td></tr>
-          <tr><td>Power(b,n)</td><td>O(log n)</td><td>O(log n)</td></tr>
-          <tr><td>BinSearch(n)</td><td>O(log n)</td><td>O(log n)</td></tr>
-        </table>
+      <div class="metric-card amber">
+        <div class="metric-label">Comparisons</div>
+        <div class="metric-value" id="m-comps">0</div>
+        <div class="metric-sub">total ops</div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-label">Swaps</div>
+        <div class="metric-value" id="m-swaps">0</div>
+        <div class="metric-sub">writes</div>
+      </div>
+      <div class="metric-card purple">
+        <div class="metric-label">Steps</div>
+        <div class="metric-value" id="m-steps">0</div>
+        <div class="metric-sub">progress</div>
       </div>
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">⚙️ Configure Simulation</div>
-    <div class="controls">
-      <div class="ctrl-group">
-        <label>🪄 Function</label>
-        <select id="rec-fn">
-          <option value="factorial">🔢 Factorial(n)</option>
-          <option value="fibonacci">🌀 Fibonacci — Naive</option>
-          <option value="fib_memo">⚡ Fibonacci — Memoized</option>
-          <option value="hanoi">🏛️ Tower of Hanoi</option>
-          <option value="gcd">🔗 GCD (Euclidean)</option>
-          <option value="power">💥 Fast Power (base^n)</option>
-          <option value="binary">🔍 Binary Search</option>
-        </select>
+    <!-- Progress bar -->
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Progress</span>
+        <span id="progress-pct">0%</span>
       </div>
-      <div class="ctrl-group">
-        <label>🔢 n</label>
-        <input type="number" id="rec-n" value="5" min="1" max="12" style="width:75px">
-      </div>
-      <div class="ctrl-group" id="rec-b-wrap" style="display:none;flex-direction:column;gap:4px">
-        <label id="rec-b-label">b value:</label>
-        <input type="number" id="rec-b" value="18" min="0" style="width:80px">
-      </div>
-      <div class="ctrl-group speed-row">
-        <label>⏩ Speed</label>
-        <input type="range" id="rec-speed" min="1" max="5" value="3" style="width:90px">
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
       </div>
     </div>
-    <div class="controls">
-      <button class="btn btn-purple" onclick="RecModule.runRecursion()">🪄 Animate!</button>
-      <button class="btn btn-ghost"  onclick="RecModule.clearRec()">🗑️ Clear</button>
+
+    <!-- MST Result (shown only in MST section) -->
+    <div id="mst-result-section" style="display:none;border-top:1px solid var(--border);padding:14px;flex-shrink:0">
+      <div style="font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        MST Result
+        <span style="flex:1;height:1px;background:var(--border)"></span>
+      </div>
+      <div id="mst-result-log"
+           style="font-family:var(--mono);font-size:.78rem;line-height:1.85;color:var(--muted)">
+        <span style="color:var(--muted)">Run an algorithm to see results here.</span>
+      </div>
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">🌳 Call Tree</div>
-    <div id="rec-tree"><span style="color:var(--muted);font-weight:600">Choose a function above and click Animate! ✨</span></div>
-    <div class="stat-row" style="margin-top:14px">
-      <div class="stat-box"><div class="stat-label">📞 Total Calls</div><div class="stat-value" id="rec-calls">0</div></div>
-      <div class="stat-box"><div class="stat-label">📏 Max Depth</div><div class="stat-value" id="rec-depth">0</div></div>
-      <div class="stat-box"><div class="stat-label">🎯 Result</div><div class="stat-value" id="rec-result" style="font-size:1.3rem">—</div></div>
+    <!-- Log output -->
+    <div id="log-section">
+      <div class="log-header">
+        Output Log
+        <button class="log-clear-btn" id="log-clear-btn">clear</button>
+      </div>
+      <div id="log-output">
+        <div class="log-line"><span class="log-tag">[INF]</span><span>Dashboard ready. Select an algorithm.</span></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Tower of Hanoi visual (shown only for Hanoi) -->
-  <div class="card" id="hanoi-card" style="display:none">
-    <div class="card-title">🏛️ Tower of Hanoi — Disk Animation</div>
-    <div id="hanoi-wrap">
-      <canvas id="hanoi-canvas" width="600" height="200"></canvas>
-      <div class="hanoi-labels"><span>Peg A</span><span>Peg B</span><span>Peg C</span></div>
-    </div>
-    <div class="stat-row" style="margin-top:10px">
-      <div class="stat-box"><div class="stat-label">🎯 Current Move</div><div class="stat-value" id="hanoi-move-num">0</div></div>
-      <div class="stat-box"><div class="stat-label">📊 Total Moves</div><div class="stat-value" id="hanoi-total">—</div></div>
-    </div>
-    <div style="margin-top:8px;background:var(--dark);color:var(--yellow);padding:11px 14px;border-radius:10px;font-family:var(--font-mono);font-size:.87rem" id="hanoi-move-log"></div>
-  </div>
-</section>
+  </aside>
 
-<!-- ═══════════════════════════════════════════════════════════════════
-     DATA STRUCTURES TAB
-     ═══════════════════════════════════════════════════════════════════ -->
-<section id="tab-ds" class="section">
-  <div class="section-title">📚 Data Structures</div>
-  <div class="section-sub">The building blocks behind every algorithm — interactive visualizations</div>
+</div>
 
-  <!-- DS tabs -->
-  <div class="ds-tabs">
-    <button class="ds-tab active" data-ds="array">📋 Array</button>
-    <button class="ds-tab"       data-ds="stack">📚 Stack</button>
-    <button class="ds-tab"       data-ds="queue">🚶 Queue</button>
-    <button class="ds-tab"       data-ds="list">🔗 Linked List</button>
-    <button class="ds-tab"       data-ds="heap">⛰️ Min-Heap</button>
-    <button class="ds-tab"       data-ds="graph">🕸️ Graph</button>
-    <button class="ds-tab"       data-ds="uf">🔀 Union-Find</button>
-  </div>
-
-  <div class="card">
-    <div class="card-title" id="ds-canvas-title">📋 Array — Interactive</div>
-    <!-- controls -->
-    <div class="controls" style="margin-bottom:12px">
-      <input type="number" id="ds-input" placeholder="value" min="1" max="99" style="width:90px">
-      <button class="btn btn-green  btn-sm" id="ds-push-btn"  onclick="DSModule.dsOp('push')">➕ Append</button>
-      <button class="btn btn-coral  btn-sm" id="ds-pop-btn"   onclick="DSModule.dsOp('pop')">➖ Remove Last</button>
-      <button class="btn btn-yellow btn-sm" id="ds-extra-btn" onclick="DSModule.dsOp('shuffle')" style="display:none">🔀 Shuffle</button>
-    </div>
-    <div id="ds-canvas-wrap"><canvas id="ds-canvas" height="260"></canvas></div>
-  </div>
-
-  <!-- Info panels per DS -->
-  <div id="ds-panel-array" class="ds-panel active">
-    <div class="ds-info">
-      <h3>📋 Array — Random Access Container</h3>
-      <strong>Used by:</strong> All 8 sorting algorithms<br>
-      <strong>Key property:</strong> Elements stored in contiguous memory. Access any element by index in O(1).<br><br>
-      Operations: <code>access[i] O(1)</code> · <code>search O(n)</code> · <code>insert O(n)</code> · <code>delete O(n)</code><br><br>
-      In sorting: the array is passed to each algorithm. Bubble/Selection/Insertion sort in-place. Merge Sort creates auxiliary arrays for merging.
-    </div>
-  </div>
-
-  <div id="ds-panel-stack" class="ds-panel">
-    <div class="ds-info">
-      <h3>📚 Stack — LIFO (Last In, First Out)</h3>
-      <strong>Used by:</strong> Recursion (call stack), Quick Sort's recursive calls<br>
-      <strong>Key property:</strong> Only the top element is accessible. Push = add to top. Pop = remove from top.<br><br>
-      Operations: <code>push O(1)</code> · <code>pop O(1)</code> · <code>peek O(1)</code><br><br>
-      Every function call in recursion pushes a new frame onto the call stack. When the function returns, the frame is popped.
-    </div>
-  </div>
-
-  <div id="ds-panel-queue" class="ds-panel">
-    <div class="ds-info">
-      <h3>🚶 Queue — FIFO (First In, First Out)</h3>
-      <strong>Used by:</strong> BFS graph traversal (foundation for Prim's concept)<br>
-      <strong>Key property:</strong> Enqueue at back, dequeue from front. Contrast with Stack.<br><br>
-      Operations: <code>enqueue O(1)</code> · <code>dequeue O(1)</code> · <code>peek O(1)</code><br><br>
-      A <strong>Priority Queue (Min-Heap)</strong> is a special queue where the item with the smallest key exits first — used by Prim's algorithm.
-    </div>
-  </div>
-
-  <div id="ds-panel-list" class="ds-panel">
-    <div class="ds-info">
-      <h3>🔗 Singly Linked List</h3>
-      <strong>Used by:</strong> Foundation for dynamic stacks/queues and adjacency lists<br>
-      <strong>Key property:</strong> Nodes linked by pointers. No random access — must traverse from head.<br><br>
-      Operations: <code>access O(n)</code> · <code>insert at head O(1)</code> · <code>search O(n)</code><br><br>
-      Adjacency lists (used in MST algorithms) are often implemented as arrays of linked lists.
-    </div>
-  </div>
-
-  <div id="ds-panel-heap" class="ds-panel">
-    <div class="ds-info">
-      <h3>⛰️ Min-Heap — Priority Queue</h3>
-      <strong>Used by:</strong> Prim's Algorithm (always picks cheapest border edge)<br>
-      <strong>Key property:</strong> Every parent ≤ both children. Root is always the minimum.<br>
-      Stored as an array: parent of index i is at ⌊(i-1)/2⌋; children are at 2i+1 and 2i+2.<br><br>
-      Operations: <code>insert O(log n)</code> · <code>extract-min O(log n)</code> · <code>peek-min O(1)</code>
-    </div>
-  </div>
-
-  <div id="ds-panel-graph" class="ds-panel">
-    <div class="ds-info">
-      <h3>🕸️ Graph — Adjacency List</h3>
-      <strong>Used by:</strong> Both Kruskal's and Prim's MST algorithms<br>
-      <strong>Representation:</strong> Map&lt;vertex → list of (neighbor, weight)&gt;<br>
-      Space: O(V + E). Iteration over neighbors: O(degree(v)).<br><br>
-      <strong>vs. Adjacency Matrix:</strong> Matrix uses O(V²) space but O(1) edge lookup.
-      Adjacency list is preferred for sparse graphs (few edges vs V²).
-    </div>
-  </div>
-
-  <div id="ds-panel-uf" class="ds-panel">
-    <div class="ds-info">
-      <h3>🔀 Union-Find (Disjoint Set Union)</h3>
-      <strong>Used by:</strong> Kruskal's Algorithm — detects whether adding an edge would form a cycle<br>
-      <strong>Operations:</strong><br>
-      • <code>find(x)</code> — returns root of x's component. Path compression makes the tree nearly flat.<br>
-      • <code>union(x,y)</code> — merges x and y's components. Union by rank keeps the tree shallow.<br><br>
-      Both operations run in O(α(n)) ≈ O(1) amortized — effectively constant time.
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════
-     SCRIPTS — order matters: app.js last (calls module inits)
-     ═══════════════════════════════════════════════════════════════════ -->
+<!-- ── SCRIPTS ─────────────────────────────────────────────────────── -->
+<script src="utils.js"></script>
 <script src="sort.js"></script>
 <script src="mst.js"></script>
 <script src="recursion.js"></script>
-<script src="datastructs.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

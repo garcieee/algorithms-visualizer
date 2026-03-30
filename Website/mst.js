@@ -1,385 +1,383 @@
-/* ════════════════════════════════════════════════════════════════════
-   mst.js — Part 2: MST Simulation (Kruskal's & Prim's)
-
-   Data Structures used:
-   - Adjacency List   : { vertex → [(neighbor, weight)] }
-   - Union-Find (DSU) : Disjoint Set Union with path compression + union by rank
-   - Min-Heap (sorted array) : priority queue for Prim's algorithm
-   - Edge List        : sorted array of {u, v, w} for Kruskal's
-   ════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   mst.js — MST Algorithms: Kruskal's + Prim's
+   Interactive canvas graph — click to add nodes, click 2 nodes for edge
+   ═══════════════════════════════════════════════════════════════════ */
+'use strict';
 
 const MSTModule = (() => {
 
-  /* ══════════════════════════════════════════════════════════════════
-     DATA STRUCTURE 1: UNION-FIND (Disjoint Set Union)
-     Used by Kruskal's to detect cycles in O(α(n)) ≈ O(1) amortized.
+  const canvas = document.getElementById('mst-canvas');
+  const ctx    = canvas.getContext('2d');
 
-     Operations:
-       find(x)    → returns root of x's component (with path compression)
-       union(x,y) → merges components of x and y (by rank to keep tree flat)
-     ══════════════════════════════════════════════════════════════════ */
-  class UnionFind {
-    constructor(n) {
-      this.parent = Array.from({ length: n }, (_, i) => i); // each node is its own root
-      this.rank   = new Array(n).fill(0);                   // used to keep tree shallow
-    }
+  let nodes    = [];   // [{x, y, id}]
+  let edges    = [];   // [{u, v, w, state}]  state: 'normal'|'active'|'mst'|'rejected'
+  let selected = null; // node index for edge creation
+  let mstRunning = false;
 
-    /** Path compression: make every node on the path point directly to root */
-    find(x) {
-      if (this.parent[x] !== x) this.parent[x] = this.find(this.parent[x]);
-      return this.parent[x];
-    }
+  // Colors
+  const C = {
+    node:     '#1E3A5F',
+    nodeText: '#E2E8F0',
+    nodeActive: '#00D4FF',
+    nodeMst:    '#10B981',
+    edgeNormal:   '#1E3A5F',
+    edgeActive:   '#F59E0B',
+    edgeMst:      '#10B981',
+    edgeRejected: '#EF4444',
+    selected: '#8B5CF6',
+    weight:   '#64748B',
+    bg:       'transparent',
+  };
 
-    /**
-     * Union by rank: attach smaller tree under root of taller tree.
-     * Returns false if x and y are already in the same set (cycle detected).
-     */
-    union(x, y) {
-      const rx = this.find(x), ry = this.find(y);
-      if (rx === ry) return false; // same component → adding edge = cycle
-      if (this.rank[rx] < this.rank[ry]) { this.parent[rx] = ry; }
-      else if (this.rank[rx] > this.rank[ry]) { this.parent[ry] = rx; }
-      else { this.parent[ry] = rx; this.rank[rx]++; }
-      return true;
-    }
+  /* ── RESIZE ──────────────────────────────────────────────────────────── */
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width  = rect.width;
+    canvas.height = rect.height;
   }
+  window.addEventListener('resize', () => { resize(); draw(); });
 
-  /* ══════════════════════════════════════════════════════════════════
-     DATA STRUCTURE 2: ADJACENCY LIST
-     Graph stored as Map<vertex → [{v, w, idx}]>
-     Space: O(V + E), Lookup: O(degree(v))
-     ══════════════════════════════════════════════════════════════════ */
-  function buildAdjList(nodes, edges) {
-    const adj = new Map(nodes.map((_, i) => [i, []]));
-    edges.forEach((e, idx) => {
-      adj.get(e.u).push({ v: e.v, w: e.w, idx });
-      adj.get(e.v).push({ v: e.u, w: e.w, idx });
-    });
-    return adj;
-  }
-
-  /* ── INPUT VALIDATION ────────────────────────────────────────────── */
-  function validateGraph(nodes, edges) {
-    if (nodes.length < 2) throw new Error('Need at least 2 nodes.');
-    for (const e of edges) {
-      if (e.u < 0 || e.u >= nodes.length || e.v < 0 || e.v >= nodes.length)
-        throw new Error(`Edge (${e.u}--${e.v}) references invalid node.`);
-      if (e.u === e.v) throw new Error(`Self-loop on node ${e.u}.`);
-      if (e.w <= 0)    throw new Error(`Weight must be > 0, got ${e.w} on (${e.u}--${e.v}).`);
-    }
-  }
-
-  /* ══════════════════════════════════════════════════════════════════
-     KRUSKAL'S ALGORITHM
-     Data structures: Edge List (sorted) + Union-Find
-     Time: O(E log E) — dominated by sorting
-     ══════════════════════════════════════════════════════════════════ */
-  function kruskalSteps(nodes, edges) {
-    validateGraph(nodes, edges);
-    const n          = nodes.length;
-    const uf         = new UnionFind(n);
-    const sorted     = [...edges].sort((a, b) => a.w - b.w); // sort edge list by weight
-    const mstEdges   = [];
-    const steps      = [];
-    const log        = [];
-
-    log.push(`<span class="out-hi">Graph Structure — Adjacency List:</span>`);
-    const adj = buildAdjList(nodes, edges);
-    adj.forEach((nbrs, v) => {
-      log.push(`<span class="out-dim">  Node ${v} → [${nbrs.map(n=>`${n.v}(w=${n.w})`).join(', ')}]</span>`);
-    });
-    log.push('');
-    log.push(`<span class="out-hi">Edge List — sorted by weight (ascending):</span>`);
-    sorted.forEach(e => log.push(`<span class="out-dim">  (${e.u}--${e.v}, w=${e.w})</span>`));
-    log.push('');
-    log.push(`<span class="out-hi">Edge Selection + Cycle Detection (Union-Find):</span>`);
-    steps.push({ type: 'init', log: [...log], edgeStates: {}, nodeVisited: {} });
-
-    for (const e of sorted) {
-      const edgeStates = Object.fromEntries(edges.map((_, i) => [i, edges[i]._state || 'normal']));
-      edgeStates[e._idx] = 'active';
-
-      const added = uf.union(e.u, e.v);
-      if (added) {
-        mstEdges.push(e);
-        edgeStates[e._idx] = 'mst';
-        log.push(`<span class="out-add">  ✓ (${e.u}--${e.v}, w=${e.w})  ADDED — MST formation grows</span>`);
-      } else {
-        edgeStates[e._idx] = 'rejected';
-        log.push(`<span class="out-skip">  ✗ (${e.u}--${e.v}, w=${e.w})  SKIPPED — find(${e.u})==find(${e.v}) → cycle detected</span>`);
-      }
-      // persist chosen states
-      Object.entries(edgeStates).forEach(([i, s]) => { if (edges[i]) edges[i]._state = s; });
-      steps.push({ type: 'edge', log: [...log], edgeStates: { ...edgeStates }, added, edge: e });
-      if (mstEdges.length === n - 1) break;
-    }
-
-    const cost = mstEdges.reduce((s, e) => s + e.w, 0);
-    log.push('');
-    log.push(`<span class="out-hi">Edges selected for MST:</span>`);
-    mstEdges.forEach(e => log.push(`<span class="out-add">  ${e.u} -- ${e.v}  (weight ${e.w})</span>`));
-    log.push(`<span class="out-hi">Total MST Cost = ${cost}</span>`);
-    steps.push({ type: 'done', log: [...log], cost, mstResult: mstEdges });
-    return { steps, cost, mstResult: mstEdges };
-  }
-
-  /* ══════════════════════════════════════════════════════════════════
-     PRIM'S ALGORITHM
-     Data structures: Adjacency List + Min-Heap (simulated via sorted array)
-     Time: O(E log V) with binary heap
-     ══════════════════════════════════════════════════════════════════ */
-  function primSteps(nodes, edges, startNode = 0) {
-    validateGraph(nodes, edges);
-    const adj      = buildAdjList(nodes, edges);
-    const visited  = new Set();
-    const mstEdges = [];
-    const steps    = [];
-    const log      = [];
-
-    log.push(`<span class="out-hi">Graph Structure — Adjacency List:</span>`);
-    adj.forEach((nbrs, v) => {
-      log.push(`<span class="out-dim">  Node ${v} → [${nbrs.map(n=>`${n.v}(w=${n.w})`).join(', ')}]</span>`);
-    });
-    log.push('');
-    log.push(`<span class="out-hi">Starting vertex: ${startNode}</span>`);
-    log.push(`<span class="out-hi">Growing MST step by step:</span>`);
-    steps.push({ type: 'init', log: [...log], edgeStates: {}, nodeVisited: {} });
-
-    /* ── Min-Heap (priority queue via sorted array) ────────────────── */
-    // Each entry: { w, from, to, eidx }
-    const heap = [{ w: 0, from: null, to: startNode, eidx: -1 }];
-    const heapPush = item => { heap.push(item); heap.sort((a, b) => a.w - b.w); };
-
-    let stepNum = 0;
-    while (heap.length) {
-      const { w, from, to, eidx } = heap.shift(); // pop minimum
-      if (visited.has(to)) continue;
-      visited.add(to);
-
-      const edgeStates = Object.fromEntries(edges.map((e, i) => [i, e._state || 'normal']));
-      if (from !== null) {
-        mstEdges.push({ u: from, v: to, w, eidx });
-        edgeStates[eidx] = 'mst';
-        edges[eidx]._state = 'mst';
-        stepNum++;
-        log.push(`<span class="out-add">  Step ${stepNum}: Add (${from}--${to}, w=${w})</span>`);
-        log.push(`<span class="out-dim">  Visited: {${[...visited].sort((a,b)=>a-b).join(', ')}}</span>`);
-      } else {
-        log.push(`<span class="out-hi">  Starting at node ${to} — push all its edges into min-heap</span>`);
-      }
-
-      const nodeVisited = Object.fromEntries([...visited].map(v => [v, true]));
-      steps.push({ type: from === null ? 'init2' : 'edge', log: [...log], edgeStates: { ...edgeStates }, nodeVisited: { ...nodeVisited } });
-
-      for (const nb of (adj.get(to) || [])) {
-        if (!visited.has(nb.v)) heapPush({ w: nb.w, from: to, to: nb.v, eidx: nb.idx });
-      }
-    }
-
-    const cost = mstEdges.reduce((s, e) => s + e.w, 0);
-    log.push('');
-    log.push(`<span class="out-hi">Edges selected for MST:</span>`);
-    mstEdges.forEach(e => log.push(`<span class="out-add">  ${e.u} -- ${e.v}  (weight ${e.w})</span>`));
-    log.push(`<span class="out-hi">Total MST Cost = ${cost}</span>`);
-    steps.push({ type: 'done', log: [...log], cost, mstResult: mstEdges });
-    return { steps, cost, mstResult: mstEdges };
-  }
-
-  /* ── CANVAS STATE ────────────────────────────────────────────────── */
-  const canvas   = document.getElementById('mst-canvas');
-  const ctx      = canvas.getContext('2d');
-  let mstNodes   = [];    // [{x, y, visited}]
-  let mstEdges   = [];    // [{u, v, w, _state, _idx}]
-  let mstSelected = null;
-  let mstSteps   = [], mstStepIdx = 0, mstPlaying = false;
-
-  const ECOL = { normal: '#CBD5E1', mst: '#4ECDC4', rejected: '#FCA5A5', active: '#FF6B6B' };
-  const NCOL = { normal: '#1E1B4B', visited: '#4ECDC4', start: '#A855F7' };
-
-  function resizeMST() {
-    const w = canvas.parentElement.clientWidth;
-    canvas.width  = Math.min(w - 4, 960);
-    canvas.height = clamp(Math.round(window.innerHeight * 0.42), 320, 480);
-    drawMST();
-  }
-  window.addEventListener('resize', resizeMST);
-
-  function drawMST() {
+  /* ── DRAW ────────────────────────────────────────────────────────────── */
+  function draw() {
+    resize();
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
-    const startNode = parseInt(document.getElementById('prim-start').value) || 0;
 
-    // draw edges
-    for (const e of mstEdges) {
-      const u = mstNodes[e.u], v = mstNodes[e.v];
+    if (nodes.length === 0) {
+      ctx.fillStyle = '#1E3A5F';
+      ctx.font = '14px JetBrains Mono, monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Click to add nodes · Click two nodes to add an edge', W/2, H/2 - 10);
+      ctx.fillText('or use "Random Graph" to generate one', W/2, H/2 + 18);
+      return;
+    }
+
+    // Draw edges
+    for (const e of edges) {
+      const u = nodes[e.u], v = nodes[e.v];
       if (!u || !v) continue;
-      const col = ECOL[e._state] || ECOL.normal;
+      const col = e.state === 'mst'      ? C.edgeMst
+                : e.state === 'active'   ? C.edgeActive
+                : e.state === 'rejected' ? C.edgeRejected
+                : C.edgeNormal;
+      const lw  = e.state === 'mst' ? 3.5 : e.state === 'active' ? 2.5 : 1.5;
+
       ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.lineTo(v.x, v.y);
       ctx.strokeStyle = col;
-      ctx.lineWidth   = e._state === 'mst' ? 4 : e._state === 'active' ? 3 : 1.8;
-      ctx.setLineDash(e._state === 'rejected' ? [6, 4] : []);
+      ctx.lineWidth   = lw;
+      ctx.setLineDash(e.state === 'rejected' ? [6, 4] : []);
+
+      if (e.state === 'mst' || e.state === 'active') {
+        ctx.shadowColor  = col;
+        ctx.shadowBlur   = 8;
+      }
       ctx.stroke();
+      ctx.shadowBlur = 0;
       ctx.setLineDash([]);
 
-      // weight label
+      // Weight label
       const mx = (u.x + v.x) / 2, my = (u.y + v.y) / 2;
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(mx, my, 11, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.stroke();
-      ctx.fillStyle = '#1E1B4B';
-      ctx.font = 'bold 10px Nunito, sans-serif';
+      ctx.fillStyle = '#0E1525';
+      ctx.beginPath(); ctx.arc(mx, my, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = e.state === 'mst' ? '#10B981'
+                    : e.state === 'active' ? '#F59E0B'
+                    : '#64748B';
+      ctx.font = 'bold 10px JetBrains Mono, monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(e.w, mx, my);
     }
 
-    // draw nodes
-    for (let i = 0; i < mstNodes.length; i++) {
-      const n = mstNodes[i];
-      const isSelected = mstSelected === i;
-      ctx.beginPath(); ctx.arc(n.x, n.y, 20, 0, Math.PI * 2);
-      ctx.fillStyle = n.visited ? NCOL.visited : i === startNode ? NCOL.start : NCOL.normal;
+    // Draw nodes
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const isSel  = selected === i;
+      const inMST  = edges.some(e => (e.u === i || e.v === i) && e.state === 'mst');
+      const isActive = edges.some(e => (e.u === i || e.v === i) && e.state === 'active');
+
+      const col = isSel ? C.selected
+                : inMST ? C.nodeMst
+                : isActive ? C.nodeActive
+                : C.node;
+
+      // Outer glow ring
+      if (isSel || inMST || isActive) {
+        ctx.beginPath(); ctx.arc(n.x, n.y, 22, 0, Math.PI * 2);
+        ctx.fillStyle = col + '22';
+        ctx.fill();
+      }
+
+      // Node circle
+      ctx.beginPath(); ctx.arc(n.x, n.y, 18, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      if (inMST || isSel) { ctx.shadowColor = col; ctx.shadowBlur = 12; }
       ctx.fill();
-      if (isSelected) { ctx.strokeStyle = '#FF6B6B'; ctx.lineWidth = 4; ctx.stroke(); }
+      ctx.shadowBlur = 0;
+
+      // Node label
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 13px Fredoka One, cursive';
+      ctx.font = 'bold 12px JetBrains Mono, monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(i, n.x, n.y);
     }
   }
 
+  /* ── INTERACTION ─────────────────────────────────────────────────────── */
   canvas.addEventListener('click', e => {
-    if (mstPlaying) return;
-    const rect   = canvas.getBoundingClientRect();
-    const sx     = canvas.width  / rect.width;
-    const sy     = canvas.height / rect.height;
-    const cx     = (e.clientX - rect.left) * sx;
-    const cy     = (e.clientY - rect.top)  * sy;
-    const hit    = mstNodes.findIndex(n => Math.hypot(n.x - cx, n.y - cy) < 22);
+    if (mstRunning) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    const cx = (e.clientX - rect.left) * sx;
+    const cy = (e.clientY - rect.top)  * sy;
 
+    const hit = nodes.findIndex(n => Math.hypot(n.x - cx, n.y - cy) < 22);
     if (hit >= 0) {
-      if (mstSelected === null) { mstSelected = hit; }
-      else if (mstSelected !== hit) {
-        const dup = mstEdges.some(e => (e.u === mstSelected && e.v === hit) || (e.u === hit && e.v === mstSelected));
+      if (selected === null) {
+        selected = hit;
+      } else if (selected !== hit) {
+        // Check for duplicate edge
+        const dup = edges.some(ed =>
+          (ed.u === selected && ed.v === hit) || (ed.u === hit && ed.v === selected)
+        );
         if (!dup) {
           const w = rand(1, 20);
-          mstEdges.push({ u: mstSelected, v: hit, w, _state: 'normal', _idx: mstEdges.length });
+          edges.push({ u: selected, v: hit, w, state: 'normal' });
+          addLog(`Edge (${selected}–${hit}, w=${w}) added`, '');
         }
-        mstSelected = null;
-      } else { mstSelected = null; }
+        selected = null;
+      } else {
+        selected = null;
+      }
     } else {
-      if (mstNodes.length >= 15) return;
-      mstNodes.push({ x: cx, y: cy, visited: false });
-      updatePrimStart();
-      mstSelected = null;
+      if (nodes.length < 14) {
+        nodes.push({ x: cx, y: cy, id: nodes.length });
+        addLog(`Node ${nodes.length - 1} added at (${Math.round(cx)}, ${Math.round(cy)})`, '');
+      }
+      selected = null;
     }
-    drawMST();
+    draw();
+    updatePrimStart();
   });
 
   function updatePrimStart() {
-    const sel = document.getElementById('prim-start');
+    const sel = document.getElementById('prim-start-select');
+    if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = mstNodes.map((_, i) => `<option value="${i}">${i}</option>`).join('');
-    if (parseInt(cur) < mstNodes.length) sel.value = cur;
+    sel.innerHTML = nodes.map((_, i) => `<option value="${i}">${i}</option>`).join('');
+    if (parseInt(cur) < nodes.length) sel.value = cur;
   }
 
-  function addRandomGraph(n) {
-    clearMST();
-    const W = canvas.width, H = canvas.height, pad = 55;
-    for (let i = 0; i < n; i++) mstNodes.push({ x: rand(pad, W - pad), y: rand(pad, H - pad), visited: false });
-    for (let i = 0; i < n - 1; i++) mstEdges.push({ u: i, v: i + 1, w: rand(1, 20), _state: 'normal', _idx: mstEdges.length });
-    for (let k = 0; k < n * 2; k++) {
-      const u = rand(0, n - 1), v = rand(0, n - 1);
-      if (u !== v && !mstEdges.some(e => (e.u===u&&e.v===v)||(e.u===v&&e.v===u))) {
-        mstEdges.push({ u, v, w: rand(1, 20), _state: 'normal', _idx: mstEdges.length });
+  /* ── UNION-FIND ──────────────────────────────────────────────────────── */
+  class UF {
+    constructor(n) { this.p = Array.from({length:n},(_,i)=>i); this.r=[0]*n||new Array(n).fill(0); }
+    find(x) { if(this.p[x]!==x) this.p[x]=this.find(this.p[x]); return this.p[x]; }
+    union(x,y) {
+      const rx=this.find(x),ry=this.find(y);
+      if(rx===ry) return false;
+      if(this.r[rx]<this.r[ry]){this.p[rx]=ry;}
+      else if(this.r[rx]>this.r[ry]){this.p[ry]=rx;}
+      else{this.p[ry]=rx;this.r[rx]++;}
+      return true;
+    }
+  }
+
+  /* ── KRUSKAL ─────────────────────────────────────────────────────────── */
+  async function runKruskal() {
+    const n = nodes.length;
+    if (n < 2) { addLog('Need at least 2 nodes', 'skip'); return; }
+    const uf = new UF(n);
+    const sorted = [...edges].sort((a, b) => a.w - b.w);
+    const mst = [];
+
+    edges.forEach(e => e.state = 'normal'); draw();
+    addLog(`Kruskal's: sorting ${edges.length} edges by weight`, '');
+
+    for (const e of sorted) {
+      if (State.cancel) return;
+      while (State.paused && !State.cancel) await sleep(50);
+
+      e.state = 'active';
+      draw(); State.steps++; updateMetrics();
+      await sleep(speedDelay() * 4);
+
+      if (uf.union(e.u, e.v)) {
+        e.state = 'mst'; mst.push(e);
+        State.comps++;
+        addLog(`Edge (${e.u}–${e.v}, w=${e.w}) → ADDED to MST`, 'add');
+        setStatus(`Kruskal's: added edge ${e.u}–${e.v} (w=${e.w})`, 'running');
+      } else {
+        e.state = 'rejected';
+        addLog(`Edge (${e.u}–${e.v}, w=${e.w}) → SKIPPED (cycle detected)`, 'skip');
+      }
+      draw(); await sleep(speedDelay() * 3);
+      if (mst.length === n - 1) break;
+    }
+
+    const cost = mst.reduce((s, e) => s + e.w, 0);
+    draw(); updateMetrics();
+    addLog(`Kruskal's done — MST cost = ${cost}`, 'done');
+    setStatus(`Kruskal's MST complete — Total Cost = ${cost}`, 'done');
+
+    // Update right panel MST result
+    const el = document.getElementById('mst-result-log');
+    if (el) {
+      let html = `<div style="color:#10B981;font-weight:700;margin-bottom:4px">Edges selected for MST:</div>`;
+      mst.forEach(e => {
+        html += `<div style="color:#CBD5E1">${e.u} -- ${e.v} &nbsp;<span style="color:#64748B">(weight ${e.w})</span></div>`;
+      });
+      html += `<div style="color:#F59E0B;font-weight:700;margin-top:6px">Total MST Cost = ${cost}</div>`;
+      el.innerHTML = html;
+    }
+  }
+
+  /* ── PRIM ────────────────────────────────────────────────────────────── */
+  async function runPrim() {
+    const n = nodes.length;
+    if (n < 2) { addLog('Need at least 2 nodes', 'skip'); return; }
+
+    const startNode = parseInt(document.getElementById('prim-start-select')?.value || '0');
+    edges.forEach(e => e.state = 'normal'); draw();
+
+    const adj = Array.from({length: n}, () => []);
+    edges.forEach((e, idx) => {
+      adj[e.u].push({v: e.v, w: e.w, idx});
+      adj[e.v].push({v: e.u, w: e.w, idx});
+    });
+
+    const visited = new Set([startNode]);
+    const mst = [];
+    const heap = [];
+
+    for (const nb of adj[startNode]) heap.push({w: nb.w, u: startNode, v: nb.v, idx: nb.idx});
+    heap.sort((a, b) => a.w - b.w);
+
+    addLog(`Prim's: starting at node ${startNode}`, '');
+    setStatus(`Prim's: growing MST from node ${startNode}`, 'running');
+
+    while (heap.length && visited.size < n) {
+      if (State.cancel) return;
+      while (State.paused && !State.cancel) await sleep(50);
+
+      const best = heap.shift();
+      if (visited.has(best.v)) continue;
+
+      edges[best.idx].state = 'active';
+      draw(); State.steps++; updateMetrics();
+      await sleep(speedDelay() * 4);
+
+      visited.add(best.v);
+      edges[best.idx].state = 'mst';
+      mst.push(edges[best.idx]);
+      State.comps++;
+      addLog(`Step ${mst.length}: Add (${best.u}–${best.v}, w=${best.w})  Visited: {${[...visited].sort().join(',')}}`, 'add');
+      draw(); await sleep(speedDelay() * 2);
+
+      for (const nb of adj[best.v]) {
+        if (!visited.has(nb.v)) {
+          heap.push({w: nb.w, u: best.v, v: nb.v, idx: nb.idx});
+          heap.sort((a,b) => a.w - b.w);
+        }
       }
     }
-    updatePrimStart(); resizeMST(); drawMST();
-  }
 
-  function clearMST() {
-    mstNodes = []; mstEdges = []; mstSelected = null; mstSteps = []; mstStepIdx = 0; mstPlaying = false;
-    document.getElementById('mst-output-card').style.display = 'none';
-    document.getElementById('mst-step-btn').style.display   = 'none';
-    document.getElementById('mst-reset-btn').style.display  = 'none';
-    document.getElementById('mst-run-btn').style.display    = 'inline-flex';
-    updatePrimStart(); drawMST();
-  }
+    // Reject unused edges
+    edges.forEach(e => { if (e.state === 'normal') e.state = 'rejected'; });
+    const cost = mst.reduce((s, e) => s + e.w, 0);
+    draw(); updateMetrics();
+    addLog(`Prim's done — MST cost = ${cost}`, 'done');
+    setStatus(`Prim's MST complete — Total Cost = ${cost}`, 'done');
 
-  function resetMSTRun() {
-    mstEdges.forEach(e => { e._state = 'normal'; });
-    mstNodes.forEach(n => { n.visited = false; });
-    mstSteps = []; mstStepIdx = 0; mstPlaying = false;
-    document.getElementById('mst-output-card').style.display = 'none';
-    document.getElementById('mst-step-btn').style.display    = 'none';
-    document.getElementById('mst-reset-btn').style.display   = 'none';
-    document.getElementById('mst-run-btn').style.display     = 'inline-flex';
-    drawMST();
-  }
-
-  function runMST() {
-    if (mstNodes.length < 2) { alert('⚠️ Add at least 2 nodes!'); return; }
-    if (mstEdges.length < 1) { alert('⚠️ Add some edges! (Click two nodes to connect them)'); return; }
-
-    // reset edge states before running
-    mstEdges.forEach((e, i) => { e._state = 'normal'; e._idx = i; });
-    mstNodes.forEach(n => { n.visited = false; });
-
-    const algo  = document.getElementById('mst-algo').value;
-    const start = parseInt(document.getElementById('prim-start').value) || 0;
-    let result;
-    try {
-      result = algo === 'kruskal'
-        ? kruskalSteps(mstNodes, mstEdges)
-        : primSteps(mstNodes, mstEdges, start);
-    } catch (err) { alert('⚠️ ' + err.message); return; }
-
-    mstSteps = result.steps; mstStepIdx = 0; mstPlaying = true;
-    document.getElementById('mst-run-btn').style.display    = 'none';
-    document.getElementById('mst-step-btn').style.display   = 'inline-flex';
-    document.getElementById('mst-reset-btn').style.display  = 'inline-flex';
-    document.getElementById('mst-output-card').style.display = 'block';
-    document.getElementById('mst-algo-label').textContent   = algo === 'kruskal' ? "Kruskal's" : "Prim's";
-    document.getElementById('mst-log').innerHTML    = '';
-    document.getElementById('mst-result').innerHTML = '';
-    document.getElementById('mst-cost').textContent  = '—';
-    document.getElementById('mst-edge-count').textContent = '—';
-    document.getElementById('mst-output-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    autoPlayMST();
-  }
-
-  const MST_SPEED = { 1: 1400, 2: 800, 3: 450, 4: 200, 5: 60 };
-
-  async function autoPlayMST() {
-    while (mstPlaying && mstStepIdx < mstSteps.length) {
-      applyStep(mstSteps[mstStepIdx]); mstStepIdx++;
-      await sleep(MST_SPEED[parseInt(document.getElementById('mst-speed').value)] || 450);
+    const el = document.getElementById('mst-result-log');
+    if (el) {
+      let html = `<div style="color:#10B981;font-weight:700;margin-bottom:4px">Edges selected for MST:</div>`;
+      mst.forEach(e => {
+        html += `<div style="color:#CBD5E1">${e.u} -- ${e.v} &nbsp;<span style="color:#64748B">(weight ${e.w})</span></div>`;
+      });
+      html += `<div style="color:#F59E0B;font-weight:700;margin-top:6px">Total MST Cost = ${cost}</div>`;
+      el.innerHTML = html;
     }
-    if (mstStepIdx >= mstSteps.length) { mstPlaying = false; confetti(); }
   }
 
-  function stepMST() {
-    if (mstStepIdx < mstSteps.length) { applyStep(mstSteps[mstStepIdx]); mstStepIdx++; }
-  }
+  /* ── RANDOM GRAPH ────────────────────────────────────────────────────── */
+  function randomGraph(n = 7) {
+    clearGraph();
+    resize();
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H / 2;
+    const r  = Math.min(W, H) * 0.32;
 
-  function applyStep(step) {
-    if (step.edgeStates) Object.entries(step.edgeStates).forEach(([i, s]) => { if (mstEdges[i]) mstEdges[i]._state = s; });
-    if (step.nodeVisited) mstNodes.forEach((n, i) => { n.visited = !!step.nodeVisited[i]; });
-    drawMST();
-    if (step.log) { document.getElementById('mst-log').innerHTML = step.log.join('\n'); document.getElementById('mst-log').scrollTop = 9999; }
-    if (step.type === 'done') {
-      const lines = [`<span class="out-hi">Edges selected for MST:</span>`];
-      step.mstResult.forEach(e => lines.push(`<span class="out-add">  ${e.u} -- ${e.v}  (weight ${e.w})</span>`));
-      lines.push(`<span class="out-hi">Total MST Cost = ${step.cost}</span>`);
-      document.getElementById('mst-result').innerHTML = lines.join('\n');
-      animCounter(document.getElementById('mst-cost'), step.cost);
-      animCounter(document.getElementById('mst-edge-count'), step.mstResult.length);
+    for (let i = 0; i < n; i++) {
+      const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+      nodes.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), id: i });
     }
+
+    // Spanning chain
+    for (let i = 0; i < n - 1; i++) {
+      edges.push({ u: i, v: i + 1, w: rand(1, 20), state: 'normal' });
+    }
+    edges.push({ u: n - 1, v: 0, w: rand(1, 20), state: 'normal' });
+
+    // Extra random edges
+    const attempts = n * 3;
+    for (let k = 0; k < attempts; k++) {
+      const u = rand(0, n - 1), v = rand(0, n - 1);
+      if (u !== v) {
+        const dup = edges.some(e => (e.u===u&&e.v===v)||(e.u===v&&e.v===u));
+        if (!dup) edges.push({ u, v, w: rand(1, 20), state: 'normal' });
+      }
+    }
+
+    updatePrimStart(); draw();
+    addLog(`Generated random graph: ${n} nodes, ${edges.length} edges`, '');
+    setStatus(`Graph ready — ${n} vertices, ${edges.length} edges`);
+  }
+
+  function clearGraph() {
+    nodes = []; edges = []; selected = null;
+    const el = document.getElementById('mst-result-log');
+    if (el) el.innerHTML = '<span style="color:#475569">Run an algorithm to see results here.</span>';
+    draw();
+    updatePrimStart();
+    clearLog();
+  }
+
+  function resetGraph() {
+    edges.forEach(e => e.state = 'normal');
+    draw();
+    const el = document.getElementById('mst-result-log');
+    if (el) el.innerHTML = '<span style="color:#475569">Run an algorithm to see results here.</span>';
+    clearLog();
+    setStatus('Graph reset — edges cleared');
+  }
+
+  async function run() {
+    if (mstRunning) return;
+    mstRunning = true;
+    State.running = true;
+    State.cancel  = false;
+    State.paused  = false;
+    resetStats();
+    State.startTime = performance.now();
+    clearLog();
+    updatePlayBtn(true);
+
+    const algo = State.algo;
+    if (algo === 'kruskal') await runKruskal();
+    else if (algo === 'prim') await runPrim();
+
+    State.elapsedMs = performance.now() - State.startTime;
+    State.startTime = 0;
+    mstRunning = false;
+    State.running = false;
+    updatePlayBtn(false);
+    updateMetrics();
   }
 
   function init() {
-    setTimeout(() => { resizeMST(); addRandomGraph(6); }, 150);
+    resize();
+    randomGraph(7);
   }
 
-  return { init, addRandomGraph, clearMST, resetMSTRun, runMST, stepMST };
-
+  return { init, randomGraph, clearGraph, resetGraph, run };
 })();
