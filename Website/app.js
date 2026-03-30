@@ -1,244 +1,256 @@
-/* ═══════════════════════════════════════════════════════════════════
-   app.js — Main application controller
-   ═══════════════════════════════════════════════════════════════════ */
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  // ── SECTION SWITCHING ────────────────────────────────────────────────
-  const SECTIONS = {
-    sort: { view: 'sorting-section', algos: ['bubble','selection','insertion','merge','quick','rquick','counting','radix'] },
-    mst:  { view: 'mst-section',     algos: ['kruskal','prim'] },
-    rec:  { view: 'rec-section',     algos: ['factorial','fibonacci','fib_memo','hanoi','gcd','bsearch'] },
+  /* ── Algorithm metadata ─────────────────────────────────────── */
+  const ALGOS = {
+    sort: [
+      { key:'bubble',    label:'Bubble Sort',        desc:'Repeatedly compares and swaps adjacent elements. Early exit when no swaps occur.' },
+      { key:'selection', label:'Selection Sort',      desc:'Finds the minimum in the unsorted region and places it at the front each pass.' },
+      { key:'insertion', label:'Insertion Sort',      desc:'Builds a sorted prefix by inserting each element into its correct position.' },
+      { key:'merge',     label:'Merge Sort',          desc:'Divide-and-conquer: recursively split, sort, then merge. Guaranteed O(n log n).' },
+      { key:'quick',     label:'Quick Sort',          desc:'Partitions around a pivot. Average O(n log n), worst case O(n\u00b2) on sorted input.' },
+      { key:'rquick',    label:'Random-Quick Sort',   desc:'Quick Sort with random pivot selection to avoid worst-case on sorted input.' },
+      { key:'counting',  label:'Counting Sort',       desc:'Non-comparison sort. Counts element frequencies. O(n+k) time, best for small ranges.' },
+      { key:'radix',     label:'Radix Sort',          desc:'Non-comparison sort. Processes digits from least to most significant. O(nk).' },
+    ],
+    mst: [
+      { key:'kruskal', label:"Kruskal's Algorithm", desc:'Sorts all edges by weight, then greedily adds edges that do not form a cycle (Union-Find).' },
+      { key:'prim',    label:"Prim's Algorithm",    desc:'Grows the MST from a starting vertex by always choosing the cheapest border edge.' },
+    ],
+    rec: [
+      { key:'factorial', label:'Factorial',           desc:'Computes n! = n x (n-1) x ... x 1 recursively. O(n) calls, O(n) stack depth.' },
+      { key:'fibonacci', label:'Fibonacci (Naive)',    desc:'Computes fib(n) with two recursive calls. O(2^n) total calls, exponential.' },
+      { key:'fib_memo',  label:'Fibonacci (Memoized)', desc:'Same as Fibonacci but caches results. Reduces to O(n) calls via memoization.' },
+      { key:'hanoi',     label:'Tower of Hanoi',       desc:'Moves n disks between pegs. Exactly 2^n - 1 moves required.' },
+      { key:'gcd',       label:'GCD (Euclidean)',       desc:'Greatest common divisor via gcd(a,b) = gcd(b, a mod b). O(log min(a,b)).' },
+      { key:'bsearch',   label:'Binary Search',         desc:'Searches a sorted array by halving the search space each call. O(log n) depth.' },
+    ],
   };
 
+  /* ── Sync speed across both sort/mst speed controls ─────────── */
+  syncPair('speed-input', 'speed-range', v => { State.speed = v; });
+  syncPair('speed-input-mst', 'speed-range-mst', v => { State.speed = v; });
+  syncPair('rec-speed-input', 'rec-speed-range', v => { State.speed = v; });
+  syncPair('size-input', 'size-range', v => {
+    State.size = v;
+    if (!State.running && State.section === 'sort') SortModule.generate();
+  });
+  syncPair('graph-size-input', 'graph-size-range', v => { /* used when generating */ });
+  syncPair('rec-n-input', 'rec-n-range', v => { State.size = v; });
+
+  /* ── Section switching ──────────────────────────────────────── */
   function switchSection(key) {
-    // Cancel running
-    if (State.running) {
-      State.cancel = true; State.running = false; State.paused = false;
-      updatePlayBtn(false);
-    }
+    if (State.running) stopAll();
     State.section = key;
-    State.algo = SECTIONS[key].algos[0];
 
-    // Update tab buttons
-    document.querySelectorAll('.section-tab').forEach(b => {
-      b.classList.toggle('active', b.dataset.section === key);
-    });
+    // Nav tabs
+    document.querySelectorAll('.nav-tab').forEach(b =>
+      b.classList.toggle('active', b.dataset.section === key)
+    );
 
-    // Show/hide canvas elements
-    const sortCanvas = document.getElementById('sort-canvas');
-    const mstCanvas  = document.getElementById('mst-canvas');
-    const recOutput  = document.getElementById('rec-output');
-    if (sortCanvas) sortCanvas.style.display = key === 'sort' ? 'block' : 'none';
-    if (mstCanvas)  mstCanvas.style.display  = key === 'mst'  ? 'block' : 'none';
-    if (recOutput)  { recOutput.style.display = key === 'rec'  ? 'flex' : 'none'; }
+    // Settings panels
+    _el('sort-settings').style.display = key === 'sort' ? '' : 'none';
+    _el('mst-settings').style.display  = key === 'mst'  ? '' : 'none';
+    _el('rec-settings').style.display  = key === 'rec'  ? '' : 'none';
 
-    // MST controls overlay
-    const mstControls = document.getElementById('mst-controls-overlay');
-    if (mstControls) mstControls.style.display = key === 'mst' ? 'flex' : 'none';
+    // Canvas vs recursion panel
+    const canvas   = _el('vis-canvas');
+    const recPanel = _el('rec-panel');
+    const mstHint  = _el('mst-hint');
+    const mstTbar  = _el('mst-toolbar');
+    const mstResult = _el('mst-result-pane');
 
-    // Update sidebar algo list
-    renderAlgoList(key);
-    selectAlgo(SECTIONS[key].algos[0], key);
+    if (key === 'rec') {
+      canvas.style.display   = 'none';
+      recPanel.classList.add('visible');
+    } else {
+      canvas.style.display   = 'block';
+      recPanel.classList.remove('visible');
+    }
 
-    // Show/hide right panel MST result
-    const mstResultSection = document.getElementById('mst-result-section');
-    if (mstResultSection) mstResultSection.style.display = key === 'mst' ? 'block' : 'none';
+    mstHint.classList.toggle('visible', key === 'mst');
+    mstTbar.style.display   = key === 'mst' ? 'flex' : 'none';
+    mstResult.classList.toggle('visible', key === 'mst');
 
-    // Show/hide B input in rec
-    const bWrap = document.getElementById('rec-b-wrap');
-    if (bWrap) bWrap.style.display = key === 'rec' ? 'flex' : 'none';
+    // Populate algo dropdown
+    buildAlgoSelect(key);
 
-    // Prim start select
-    const primWrap = document.getElementById('prim-start-wrap');
-    if (primWrap) primWrap.style.display = key === 'mst' && State.algo === 'prim' ? 'flex' : 'none';
+    // Section breadcrumb
+    const secLabels = { sort:'Sorting', mst:'MST', rec:'Recursion' };
+    const tbSection = _el('tb-section');
+    if (tbSection) tbSection.textContent = secLabels[key] || key;
 
     resetStats(); updateMetrics(); clearLog();
     setStatus('Ready');
+    setRunBtn(false);
   }
 
-  // ── ALGO LIST RENDER ─────────────────────────────────────────────────
-  const ALGO_NAMES = {
-    bubble:    'Bubble Sort',
-    selection: 'Selection Sort',
-    insertion: 'Insertion Sort',
-    merge:     'Merge Sort',
-    quick:     'Quick Sort',
-    rquick:    'Random-Quick Sort',
-    counting:  'Counting Sort',
-    radix:     'Radix Sort',
-    kruskal:   "Kruskal's",
-    prim:      "Prim's",
-    factorial: 'Factorial',
-    fibonacci: 'Fibonacci (Naive)',
-    fib_memo:  'Fibonacci (Memo)',
-    hanoi:     'Tower of Hanoi',
-    gcd:       'GCD (Euclidean)',
-    bsearch:   'Binary Search',
-  };
+  /* ── Algo select dropdown ───────────────────────────────────── */
+  function buildAlgoSelect(section) {
+    const sel  = _el('algo-select');
+    const list = ALGOS[section] || [];
+    sel.innerHTML = list.map(a =>
+      `<option value="${a.key}">${a.label}</option>`
+    ).join('');
 
-  const ALGO_DESC = {
-    bubble:    'Compare & swap adjacent pairs',
-    selection: 'Find min, place at front each pass',
-    insertion: 'Build sorted prefix, insert key',
-    merge:     'Divide, sort halves, merge O(n log n)',
-    quick:     'Partition around pivot, recurse',
-    rquick:    'Quick Sort with random pivot',
-    counting:  'Count frequencies, non-comparison',
-    radix:     'Sort digit by digit, LSD',
-    kruskal:   'Sort edges, add if no cycle (Union-Find)',
-    prim:      'Grow MST greedily from start vertex',
-    factorial: 'n! = n × (n-1) × … × 1',
-    fibonacci: 'fib(n) = fib(n-1) + fib(n-2), O(2^n)',
-    fib_memo:  'Fibonacci with memoization, O(n)',
-    hanoi:     'Move n disks, 2^n - 1 moves',
-    gcd:       'gcd(a,b) = gcd(b, a mod b)',
-    bsearch:   'Halve search space each call, O(log n)',
-  };
-
-  function renderAlgoList(section) {
-    const list = document.getElementById('algo-list');
-    if (!list) return;
-    list.innerHTML = '';
-    for (const key of SECTIONS[section].algos) {
-      const div = document.createElement('div');
-      div.className = 'algo-item';
-      div.dataset.algo = key;
-      div.innerHTML = `<span class="algo-dot"></span>${ALGO_NAMES[key] || key}`;
-      div.addEventListener('click', () => selectAlgo(key, section));
-      list.appendChild(div);
-
-      const desc = document.createElement('div');
-      desc.className = 'algo-desc';
-      desc.textContent = ALGO_DESC[key] || '';
-      list.appendChild(desc);
-    }
+    const first = list[0];
+    if (first) selectAlgo(first.key, section);
+    sel.value = first?.key || '';
   }
 
   function selectAlgo(key, section) {
     State.algo = key;
-    document.querySelectorAll('.algo-item').forEach(el => {
-      el.classList.toggle('active', el.dataset.algo === key);
-    });
+    const sec  = section || State.section;
+    const meta = (ALGOS[sec] || []).find(a => a.key === key);
 
-    // Update complexity display if sorting
-    if (section === 'sort' || State.section === 'sort') {
-      SortModule.updateComplexity(key);
+    // Description
+    const desc = _el('algo-description');
+    if (desc) desc.textContent = meta?.desc || '';
+
+    // Breadcrumb
+    const tbAlgo = _el('tb-algo');
+    if (tbAlgo) tbAlgo.textContent = meta?.label || key;
+
+    // Complexity
+    updateComplexity(key);
+
+    // Prim start node visibility
+    const primWrap = _el('prim-start-wrap');
+    if (primWrap) primWrap.style.display = key === 'prim' ? '' : 'none';
+
+    // Rec second param visibility
+    const bRow = _el('rec-b-row');
+    if (bRow) {
+      const needsB = key === 'gcd' || key === 'bsearch';
+      bRow.style.display = needsB ? '' : 'none';
+      const bLbl = _el('rec-b-label');
+      if (bLbl) bLbl.textContent = key === 'gcd' ? 'b (second value)' : 'Target value';
     }
 
-    // Prim start select visibility
-    const primWrap = document.getElementById('prim-start-wrap');
-    if (primWrap) primWrap.style.display = (key === 'prim') ? 'flex' : 'none';
-
-    // B input for rec algos that need it
-    const bWrap = document.getElementById('rec-b-wrap');
-    const bLabel = document.getElementById('rec-b-label');
-    if (bWrap && State.section === 'rec') {
-      const meta = { gcd: {hasB:true,bLabel:'b value'}, bsearch: {hasB:true,bLabel:'target'} };
-      const m = meta[key];
-      bWrap.style.display = m ? 'flex' : 'none';
-      if (bLabel && m) bLabel.textContent = m.bLabel + ':';
+    // Rec n range max
+    const recMaxN = { factorial:12, fibonacci:9, fib_memo:15, hanoi:7, gcd:99, bsearch:20 };
+    const recRng  = _el('rec-n-range');
+    const recInp  = _el('rec-n-input');
+    if (recRng && recMaxN[key]) {
+      recRng.max = recMaxN[key];
+      if (parseInt(recInp?.value) > recMaxN[key] && recInp) recInp.value = Math.min(6, recMaxN[key]);
     }
-
-    // Update header algo display
-    const algoDisplay = document.getElementById('algo-display');
-    if (algoDisplay) algoDisplay.textContent = ALGO_NAMES[key] || key;
   }
 
-  // ── CONTROLS WIRING ──────────────────────────────────────────────────
-  // Section tabs
-  document.querySelectorAll('.section-tab').forEach(btn => {
-    btn.addEventListener('click', () => switchSection(btn.dataset.section));
+  /* ── Stop any running algo ──────────────────────────────────── */
+  function stopAll() {
+    State.cancel  = true;
+    State.running = false;
+    State.paused  = false;
+    setRunBtn(false);
+  }
+
+  /* ── Keyboard shortcuts ─────────────────────────────────────── */
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      _el('btn-run')?.click();
+    }
+    if (e.key === 'r' || e.key === 'R') _el('btn-reset')?.click();
+    if (e.key === 'g' || e.key === 'G') _el('btn-generate')?.click();
   });
 
-  // Play/Run button
-  document.getElementById('run-btn')?.addEventListener('click', () => {
-    if (State.section === 'sort') SortModule.run();
-    else if (State.section === 'mst') MSTModule.run();
-    else if (State.section === 'rec') RecModule.run();
+  /* ── Wire algo dropdown ─────────────────────────────────────── */
+  _el('algo-select').addEventListener('change', function() {
+    selectAlgo(this.value, State.section);
   });
 
-  // Step button (pause then advance one tick)
-  document.getElementById('step-btn')?.addEventListener('click', () => {
+  /* ── Wire nav tabs ──────────────────────────────────────────── */
+  document.querySelectorAll('.nav-tab').forEach(btn =>
+    btn.addEventListener('click', () => switchSection(btn.dataset.section))
+  );
+
+  /* ── Header buttons ─────────────────────────────────────────── */
+  _el('btn-run').addEventListener('click', () => {
+    if (State.running) {
+      State.paused = !State.paused;
+      setRunBtn(!State.paused);
+      setStatus(State.paused ? 'Paused' : 'Running...', State.paused ? 'idle' : 'running');
+    } else {
+      if (State.section === 'sort') SortModule.run();
+      else if (State.section === 'mst') MSTModule.run();
+      else if (State.section === 'rec') RecModule.run();
+    }
+  });
+
+  _el('btn-generate').addEventListener('click', () => {
+    if (State.section === 'sort') { stopAll(); setTimeout(() => SortModule.generate(), 50); }
+    else if (State.section === 'mst') {
+      const n = clamp(parseInt(_el('graph-size-input')?.value || '7'), 3, 12);
+      MSTModule.randomGraph(n);
+    } else if (State.section === 'rec') {
+      RecModule.reset();
+    }
+  });
+
+  _el('btn-step').addEventListener('click', () => {
     if (!State.running) {
       if (State.section === 'sort') SortModule.run();
       else if (State.section === 'mst') MSTModule.run();
       else if (State.section === 'rec') RecModule.run();
-      State.paused = true;
-      updatePlayBtn(false);
+      setTimeout(() => { State.paused = true; setRunBtn(false); }, speedDelay() * 3 + 20);
     } else {
       State.paused = false;
-      setTimeout(() => { State.paused = true; }, speedDelay() * 2 || 100);
+      setTimeout(() => { if (State.running) { State.paused = true; setRunBtn(false); } }, speedDelay() * 2 + 20);
     }
   });
 
-  // Reset button
-  document.getElementById('reset-btn')?.addEventListener('click', () => {
-    if (State.section === 'sort')      SortModule.reset();
-    else if (State.section === 'mst')  { State.cancel=true; setTimeout(()=>{MSTModule.resetGraph(); State.cancel=false;},50); }
-    else if (State.section === 'rec')  RecModule.reset();
-    updatePlayBtn(false);
+  _el('btn-reset').addEventListener('click', () => {
+    stopAll();
+    setTimeout(() => {
+      if (State.section === 'sort') SortModule.generate();
+      else if (State.section === 'mst') MSTModule.resetEdges();
+      else if (State.section === 'rec') RecModule.reset();
+      resetStats(); updateMetrics(); clearLog();
+      setStatus('Ready'); setRunBtn(false);
+    }, 60);
   });
 
-  // Generate
-  document.getElementById('gen-btn')?.addEventListener('click', () => {
-    if (State.section === 'sort') SortModule.generate();
-    else if (State.section === 'mst') {
-      const n = parseInt(document.getElementById('size-input')?.value || '7');
-      MSTModule.randomGraph(clamp(n, 4, 12));
-    } else if (State.section === 'rec') {
-      clearLog();
-      const trace = document.getElementById('rec-trace');
-      if (trace) trace.innerHTML = '<span style="color:#475569;font-family:var(--mono)">Ready — click ▶ Run</span>';
-    }
-  });
+  /* ── Panel buttons ──────────────────────────────────────────── */
+  _el('panel-generate')?.addEventListener('click', () => _el('btn-generate').click());
+  _el('panel-reset')?.addEventListener('click', () => _el('btn-reset').click());
 
-  // Size slider
-  const sizeSlider = document.getElementById('size-slider');
-  const sizeDisplay = document.getElementById('size-display');
-  sizeSlider?.addEventListener('input', () => {
-    State.size = parseInt(sizeSlider.value);
-    if (sizeDisplay) sizeDisplay.textContent = State.size;
-    if (!State.running && State.section === 'sort') SortModule.generate();
-  });
-
-  // Speed slider
-  const speedSlider = document.getElementById('speed-slider');
-  const speedDisplay = document.getElementById('speed-display');
-  speedSlider?.addEventListener('input', () => {
-    State.speed = parseInt(speedSlider.value);
-    if (speedDisplay) speedDisplay.textContent = State.speed;
-  });
-
-  // Dataset type
-  document.getElementById('dataset-select')?.addEventListener('change', function() {
-    State.dataset = this.value;
-    if (!State.running && State.section === 'sort') SortModule.generate();
-  });
-
-  // Log clear
-  document.getElementById('log-clear-btn')?.addEventListener('click', clearLog);
-
-  // MST specific
-  document.getElementById('mst-random-btn')?.addEventListener('click', () => {
-    const n = clamp(parseInt(sizeSlider?.value || '7'), 4, 12);
+  _el('mst-panel-generate')?.addEventListener('click', () => {
+    const n = clamp(parseInt(_el('graph-size-input')?.value || '7'), 3, 12);
     MSTModule.randomGraph(n);
   });
-  document.getElementById('mst-clear-btn')?.addEventListener('click', () => MSTModule.clearGraph());
-  document.getElementById('mst-reset-btn2')?.addEventListener('click', () => MSTModule.resetGraph());
+  _el('mst-panel-reset')?.addEventListener('click', () => MSTModule.resetEdges());
 
-  // ── INIT ──────────────────────────────────────────────────────────────
+  _el('rec-panel-reset')?.addEventListener('click', () => RecModule.reset());
+
+  /* ── MST toolbar buttons ────────────────────────────────────── */
+  _el('mst-random')?.addEventListener('click', () => {
+    const n = clamp(parseInt(_el('graph-size-input')?.value || '7'), 3, 12);
+    MSTModule.randomGraph(n);
+  });
+  _el('mst-reset-edges')?.addEventListener('click', () => MSTModule.resetEdges());
+  _el('mst-clear')?.addEventListener('click', () => MSTModule.clearAll());
+
+  /* ── Log clear ──────────────────────────────────────────────── */
+  _el('btn-log-clear')?.addEventListener('click', clearLog);
+
+  /* ── Prim start node select ─────────────────────────────────── */
+  _el('prim-start')?.addEventListener('change', function() {
+    MSTModule.setPrimStart(parseInt(this.value));
+  });
+
+  /* ── Metrics ticker ─────────────────────────────────────────── */
+  setInterval(() => {
+    if (State.running && State.startTime) updateMetrics();
+  }, 120);
+
+  /* ── Init ───────────────────────────────────────────────────── */
   switchSection('sort');
   SortModule.init();
   MSTModule.init();
   RecModule.init();
 
-  // Initial status
-  setStatus('Ready — select an algorithm and click ▶ Run');
-
-  // Metrics auto-update ticker
-  setInterval(() => {
-    if (State.running && State.startTime) updateMetrics();
-  }, 100);
+  setStatus('Ready. Select an algorithm and click Run.');
 });

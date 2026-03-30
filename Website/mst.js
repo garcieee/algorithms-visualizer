@@ -1,259 +1,256 @@
-/* ═══════════════════════════════════════════════════════════════════
-   mst.js — MST Algorithms: Kruskal's + Prim's
-   Interactive canvas graph — click to add nodes, click 2 nodes for edge
-   ═══════════════════════════════════════════════════════════════════ */
 'use strict';
 
 const MSTModule = (() => {
 
-  const canvas = document.getElementById('mst-canvas');
+  const canvas = _el('vis-canvas');
   const ctx    = canvas.getContext('2d');
 
-  let nodes    = [];   // [{x, y, id}]
-  let edges    = [];   // [{u, v, w, state}]  state: 'normal'|'active'|'mst'|'rejected'
-  let selected = null; // node index for edge creation
-  let mstRunning = false;
+  let nodes      = [];
+  let edges      = [];
+  let selNode    = null;
+  let primStart  = 0;
+  let isRunning  = false;
 
-  // Colors
+  /* ── Colors ─────────────────────────────────────────────────── */
   const C = {
-    node:     '#1E3A5F',
-    nodeText: '#E2E8F0',
-    nodeActive: '#00D4FF',
-    nodeMst:    '#10B981',
-    edgeNormal:   '#1E3A5F',
-    edgeActive:   '#F59E0B',
-    edgeMst:      '#10B981',
-    edgeRejected: '#EF4444',
-    selected: '#8B5CF6',
-    weight:   '#64748B',
-    bg:       'transparent',
+    node:       '#1a2035',
+    nodeText:   '#ffffff',
+    nodeActive: '#0097a7',
+    nodeMst:    '#4caf50',
+    edgeNormal: '#c5cad8',
+    edgeActive: '#ff9800',
+    edgeMst:    '#0097a7',
+    edgeReject: '#f44336',
+    weightBg:   '#ffffff',
+    weightBdr:  '#c5cad8',
+    selected:   '#9c27b0',
   };
 
-  /* ── RESIZE ──────────────────────────────────────────────────────────── */
   function resize() {
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width  = rect.width;
-    canvas.height = rect.height;
+    const r = canvas.parentElement.getBoundingClientRect();
+    canvas.width  = r.width;
+    canvas.height = r.height;
   }
+
   window.addEventListener('resize', () => { resize(); draw(); });
 
-  /* ── DRAW ────────────────────────────────────────────────────────────── */
+  /* ── Draw ────────────────────────────────────────────────────── */
   function draw() {
     resize();
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    if (nodes.length === 0) {
-      ctx.fillStyle = '#1E3A5F';
-      ctx.font = '14px JetBrains Mono, monospace';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('Click to add nodes · Click two nodes to add an edge', W/2, H/2 - 10);
-      ctx.fillText('or use "Random Graph" to generate one', W/2, H/2 + 18);
+    if (!nodes.length) {
+      ctx.fillStyle = '#9aa0b0';
+      ctx.font = '13px Source Sans 3, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Click anywhere to add a node, or use "Random Graph".', W / 2, H / 2 - 10);
+      ctx.fillText('Click two nodes consecutively to add an edge.', W / 2, H / 2 + 14);
       return;
     }
 
-    // Draw edges
+    // Edges
     for (const e of edges) {
       const u = nodes[e.u], v = nodes[e.v];
       if (!u || !v) continue;
-      const col = e.state === 'mst'      ? C.edgeMst
-                : e.state === 'active'   ? C.edgeActive
-                : e.state === 'rejected' ? C.edgeRejected
-                : C.edgeNormal;
-      const lw  = e.state === 'mst' ? 3.5 : e.state === 'active' ? 2.5 : 1.5;
 
-      ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.lineTo(v.x, v.y);
+      const col = e.state === 'mst'    ? C.edgeMst
+                : e.state === 'active' ? C.edgeActive
+                : e.state === 'reject' ? C.edgeReject
+                : C.edgeNormal;
+      const lw  = e.state === 'mst' || e.state === 'active' ? 2.5 : 1.5;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(u.x, u.y);
+      ctx.lineTo(v.x, v.y);
       ctx.strokeStyle = col;
       ctx.lineWidth   = lw;
-      ctx.setLineDash(e.state === 'rejected' ? [6, 4] : []);
-
-      if (e.state === 'mst' || e.state === 'active') {
-        ctx.shadowColor  = col;
-        ctx.shadowBlur   = 8;
-      }
+      if (e.state === 'reject') ctx.setLineDash([5, 4]);
       ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.setLineDash([]);
+      ctx.restore();
 
-      // Weight label
+      // Weight badge
       const mx = (u.x + v.x) / 2, my = (u.y + v.y) / 2;
-      ctx.fillStyle = '#0E1525';
-      ctx.beginPath(); ctx.arc(mx, my, 12, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.fillStyle = e.state === 'mst' ? '#10B981'
-                    : e.state === 'active' ? '#F59E0B'
-                    : '#64748B';
-      ctx.font = 'bold 10px JetBrains Mono, monospace';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const badgeR = 12;
+      ctx.beginPath();
+      ctx.arc(mx, my, badgeR, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = e.state === 'normal' ? '#d0d4de' : col;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = e.state === 'mst'    ? '#0097a7'
+                    : e.state === 'active' ? '#e65100'
+                    : '#6b7a99';
+      ctx.font = 'bold 10px Source Code Pro, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.fillText(e.w, mx, my);
     }
 
-    // Draw nodes
+    // Nodes
     for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
-      const isSel  = selected === i;
-      const inMST  = edges.some(e => (e.u === i || e.v === i) && e.state === 'mst');
-      const isActive = edges.some(e => (e.u === i || e.v === i) && e.state === 'active');
+      const n   = nodes[i];
+      const sel = selNode === i;
+      const inMst = edges.some(e => (e.u === i || e.v === i) && e.state === 'mst');
+      const isAct = edges.some(e => (e.u === i || e.v === i) && e.state === 'active');
+      const isPS  = (primStart === i);
 
-      const col = isSel ? C.selected
-                : inMST ? C.nodeMst
-                : isActive ? C.nodeActive
-                : C.node;
+      const fill = sel ? C.selected : inMst ? C.nodeMst : isAct ? C.nodeActive : C.node;
 
-      // Outer glow ring
-      if (isSel || inMST || isActive) {
-        ctx.beginPath(); ctx.arc(n.x, n.y, 22, 0, Math.PI * 2);
-        ctx.fillStyle = col + '22';
+      // Halo
+      if (sel || inMst || isAct || isPS) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 24, 0, Math.PI * 2);
+        ctx.fillStyle = fill + '22';
         ctx.fill();
       }
 
-      // Node circle
-      ctx.beginPath(); ctx.arc(n.x, n.y, 18, 0, Math.PI * 2);
-      ctx.fillStyle = col;
-      if (inMST || isSel) { ctx.shadowColor = col; ctx.shadowBlur = 12; }
+      // Circle
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 18, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
       ctx.fill();
-      ctx.shadowBlur = 0;
 
-      // Node label
+      if (isPS && State.algo === 'prim') {
+        ctx.strokeStyle = '#ffeb3b';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Label
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 12px JetBrains Mono, monospace';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 12px Source Code Pro, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       ctx.fillText(i, n.x, n.y);
     }
   }
 
-  /* ── INTERACTION ─────────────────────────────────────────────────────── */
+  /* ── Interaction ─────────────────────────────────────────────── */
   canvas.addEventListener('click', e => {
-    if (mstRunning) return;
+    if (isRunning || State.running) return;
     const rect = canvas.getBoundingClientRect();
-    const sx = canvas.width / rect.width;
+    const sx = canvas.width  / rect.width;
     const sy = canvas.height / rect.height;
     const cx = (e.clientX - rect.left) * sx;
     const cy = (e.clientY - rect.top)  * sy;
 
     const hit = nodes.findIndex(n => Math.hypot(n.x - cx, n.y - cy) < 22);
     if (hit >= 0) {
-      if (selected === null) {
-        selected = hit;
-      } else if (selected !== hit) {
-        // Check for duplicate edge
+      if (selNode === null) {
+        selNode = hit;
+      } else if (selNode !== hit) {
         const dup = edges.some(ed =>
-          (ed.u === selected && ed.v === hit) || (ed.u === hit && ed.v === selected)
+          (ed.u === selNode && ed.v === hit) || (ed.u === hit && ed.v === selNode)
         );
         if (!dup) {
           const w = rand(1, 20);
-          edges.push({ u: selected, v: hit, w, state: 'normal' });
-          addLog(`Edge (${selected}–${hit}, w=${w}) added`, '');
+          edges.push({ u: selNode, v: hit, w, state: 'normal' });
+          addLog(`Edge (${selNode} - ${hit}, w=${w}) added.`, 'info');
         }
-        selected = null;
+        selNode = null;
       } else {
-        selected = null;
+        selNode = null;
       }
     } else {
       if (nodes.length < 14) {
-        nodes.push({ x: cx, y: cy, id: nodes.length });
-        addLog(`Node ${nodes.length - 1} added at (${Math.round(cx)}, ${Math.round(cy)})`, '');
+        nodes.push({ x: cx, y: cy });
+        updatePrimSelect();
+        addLog(`Node ${nodes.length - 1} added.`, 'info');
       }
-      selected = null;
+      selNode = null;
     }
     draw();
-    updatePrimStart();
   });
 
-  function updatePrimStart() {
-    const sel = document.getElementById('prim-start-select');
+  function updatePrimSelect() {
+    const sel = _el('prim-start');
     if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = nodes.map((_, i) => `<option value="${i}">${i}</option>`).join('');
+    sel.innerHTML = nodes.map((_, i) => `<option value="${i}">Node ${i}</option>`).join('');
     if (parseInt(cur) < nodes.length) sel.value = cur;
   }
 
-  /* ── UNION-FIND ──────────────────────────────────────────────────────── */
+  /* ── Union-Find ──────────────────────────────────────────────── */
   class UF {
-    constructor(n) { this.p = Array.from({length:n},(_,i)=>i); this.r=[0]*n||new Array(n).fill(0); }
-    find(x) { if(this.p[x]!==x) this.p[x]=this.find(this.p[x]); return this.p[x]; }
-    union(x,y) {
-      const rx=this.find(x),ry=this.find(y);
-      if(rx===ry) return false;
-      if(this.r[rx]<this.r[ry]){this.p[rx]=ry;}
-      else if(this.r[rx]>this.r[ry]){this.p[ry]=rx;}
-      else{this.p[ry]=rx;this.r[rx]++;}
+    constructor(n) { this.p = Array.from({ length: n }, (_, i) => i); this.r = new Array(n).fill(0); }
+    find(x) { if (this.p[x] !== x) this.p[x] = this.find(this.p[x]); return this.p[x]; }
+    union(x, y) {
+      const rx = this.find(x), ry = this.find(y);
+      if (rx === ry) return false;
+      if (this.r[rx] < this.r[ry]) { this.p[rx] = ry; }
+      else if (this.r[rx] > this.r[ry]) { this.p[ry] = rx; }
+      else { this.p[ry] = rx; this.r[rx]++; }
       return true;
     }
   }
 
-  /* ── KRUSKAL ─────────────────────────────────────────────────────────── */
+  /* ── Kruskal ─────────────────────────────────────────────────── */
   async function runKruskal() {
-    const n = nodes.length;
-    if (n < 2) { addLog('Need at least 2 nodes', 'skip'); return; }
+    if (nodes.length < 2 || !edges.length) {
+      addLog('Add at least 2 nodes and some edges first.', 'info');
+      return;
+    }
+    const n  = nodes.length;
     const uf = new UF(n);
-    const sorted = [...edges].sort((a, b) => a.w - b.w);
+    const se = [...edges].sort((a, b) => a.w - b.w);
     const mst = [];
+    edges.forEach(e => { e.state = 'normal'; });
+    draw();
 
-    edges.forEach(e => e.state = 'normal'); draw();
-    addLog(`Kruskal's: sorting ${edges.length} edges by weight`, '');
-
-    for (const e of sorted) {
+    addLog(`Kruskal: sorting ${edges.length} edges by weight...`, 'info');
+    for (const e of se) {
       if (State.cancel) return;
       while (State.paused && !State.cancel) await sleep(50);
 
       e.state = 'active';
       draw(); State.steps++; updateMetrics();
-      await sleep(speedDelay() * 4);
+      await sleep(speedDelay() * 5);
 
       if (uf.union(e.u, e.v)) {
         e.state = 'mst'; mst.push(e);
         State.comps++;
-        addLog(`Edge (${e.u}–${e.v}, w=${e.w}) → ADDED to MST`, 'add');
-        setStatus(`Kruskal's: added edge ${e.u}–${e.v} (w=${e.w})`, 'running');
+        addLog(`Add edge (${e.u} - ${e.v}, w=${e.w}). MST edges: ${mst.length}.`, 'add');
       } else {
-        e.state = 'rejected';
-        addLog(`Edge (${e.u}–${e.v}, w=${e.w}) → SKIPPED (cycle detected)`, 'skip');
+        e.state = 'reject';
+        addLog(`Skip edge (${e.u} - ${e.v}, w=${e.w}). Would form a cycle.`, 'skip');
       }
-      draw(); await sleep(speedDelay() * 3);
+      draw();
+      await sleep(speedDelay() * 3);
       if (mst.length === n - 1) break;
     }
 
     const cost = mst.reduce((s, e) => s + e.w, 0);
-    draw(); updateMetrics();
-    addLog(`Kruskal's done — MST cost = ${cost}`, 'done');
-    setStatus(`Kruskal's MST complete — Total Cost = ${cost}`, 'done');
-
-    // Update right panel MST result
-    const el = document.getElementById('mst-result-log');
-    if (el) {
-      let html = `<div style="color:#10B981;font-weight:700;margin-bottom:4px">Edges selected for MST:</div>`;
-      mst.forEach(e => {
-        html += `<div style="color:#CBD5E1">${e.u} -- ${e.v} &nbsp;<span style="color:#64748B">(weight ${e.w})</span></div>`;
-      });
-      html += `<div style="color:#F59E0B;font-weight:700;margin-top:6px">Total MST Cost = ${cost}</div>`;
-      el.innerHTML = html;
-    }
+    showMstResult(mst, cost);
+    addLog(`Kruskal complete. MST cost = ${cost}.`, 'done');
+    setStatus(`Kruskal done. MST total cost = ${cost}.`, 'done');
   }
 
-  /* ── PRIM ────────────────────────────────────────────────────────────── */
+  /* ── Prim ────────────────────────────────────────────────────── */
   async function runPrim() {
-    const n = nodes.length;
-    if (n < 2) { addLog('Need at least 2 nodes', 'skip'); return; }
-
-    const startNode = parseInt(document.getElementById('prim-start-select')?.value || '0');
-    edges.forEach(e => e.state = 'normal'); draw();
-
-    const adj = Array.from({length: n}, () => []);
+    if (nodes.length < 2 || !edges.length) {
+      addLog('Add at least 2 nodes and some edges first.', 'info');
+      return;
+    }
+    const n   = nodes.length;
+    const adj = Array.from({ length: n }, () => []);
     edges.forEach((e, idx) => {
-      adj[e.u].push({v: e.v, w: e.w, idx});
-      adj[e.v].push({v: e.u, w: e.w, idx});
+      adj[e.u].push({ v: e.v, w: e.w, idx });
+      adj[e.v].push({ v: e.u, w: e.w, idx });
     });
 
-    const visited = new Set([startNode]);
-    const mst = [];
-    const heap = [];
+    edges.forEach(e => { e.state = 'normal'; });
+    draw();
 
-    for (const nb of adj[startNode]) heap.push({w: nb.w, u: startNode, v: nb.v, idx: nb.idx});
+    const visited = new Set([primStart]);
+    const mst     = [];
+    const heap    = adj[primStart].map(nb => ({ w: nb.w, u: primStart, v: nb.v, idx: nb.idx }));
     heap.sort((a, b) => a.w - b.w);
 
-    addLog(`Prim's: starting at node ${startNode}`, '');
-    setStatus(`Prim's: growing MST from node ${startNode}`, 'running');
+    addLog(`Prim: starting from node ${primStart}.`, 'info');
 
     while (heap.length && visited.size < n) {
       if (State.cancel) return;
@@ -264,113 +261,111 @@ const MSTModule = (() => {
 
       edges[best.idx].state = 'active';
       draw(); State.steps++; updateMetrics();
-      await sleep(speedDelay() * 4);
+      await sleep(speedDelay() * 5);
 
       visited.add(best.v);
       edges[best.idx].state = 'mst';
       mst.push(edges[best.idx]);
       State.comps++;
-      addLog(`Step ${mst.length}: Add (${best.u}–${best.v}, w=${best.w})  Visited: {${[...visited].sort().join(',')}}`, 'add');
-      draw(); await sleep(speedDelay() * 2);
+      addLog(`Add edge (${best.u} - ${best.v}, w=${best.w}). Visited: {${[...visited].sort((a,b)=>a-b).join(', ')}}.`, 'add');
+      draw();
+      await sleep(speedDelay() * 2);
 
       for (const nb of adj[best.v]) {
         if (!visited.has(nb.v)) {
-          heap.push({w: nb.w, u: best.v, v: nb.v, idx: nb.idx});
-          heap.sort((a,b) => a.w - b.w);
+          heap.push({ w: nb.w, u: best.v, v: nb.v, idx: nb.idx });
+          heap.sort((a, b) => a.w - b.w);
         }
       }
     }
 
-    // Reject unused edges
-    edges.forEach(e => { if (e.state === 'normal') e.state = 'rejected'; });
+    edges.forEach(e => { if (e.state === 'normal') e.state = 'reject'; });
     const cost = mst.reduce((s, e) => s + e.w, 0);
-    draw(); updateMetrics();
-    addLog(`Prim's done — MST cost = ${cost}`, 'done');
-    setStatus(`Prim's MST complete — Total Cost = ${cost}`, 'done');
-
-    const el = document.getElementById('mst-result-log');
-    if (el) {
-      let html = `<div style="color:#10B981;font-weight:700;margin-bottom:4px">Edges selected for MST:</div>`;
-      mst.forEach(e => {
-        html += `<div style="color:#CBD5E1">${e.u} -- ${e.v} &nbsp;<span style="color:#64748B">(weight ${e.w})</span></div>`;
-      });
-      html += `<div style="color:#F59E0B;font-weight:700;margin-top:6px">Total MST Cost = ${cost}</div>`;
-      el.innerHTML = html;
-    }
+    draw();
+    showMstResult(mst, cost);
+    addLog(`Prim complete. MST cost = ${cost}.`, 'done');
+    setStatus(`Prim done. MST total cost = ${cost}.`, 'done');
   }
 
-  /* ── RANDOM GRAPH ────────────────────────────────────────────────────── */
-  function randomGraph(n = 7) {
-    clearGraph();
+  function showMstResult(mst, cost) {
+    const body = _el('mst-result-body');
+    if (!body) return;
+    let html = `<div style="color:#66bb6a;font-weight:600;margin-bottom:6px;font-size:11px">Edges selected for MST:</div>`;
+    mst.forEach(e => {
+      html += `<div style="color:#8892aa">${e.u} -- ${e.v} <span style="color:#5a6480">(weight ${e.w})</span></div>`;
+    });
+    html += `<div style="color:#ffb74d;font-weight:600;margin-top:8px;font-size:12px">Total MST Cost = ${cost}</div>`;
+    body.innerHTML = html;
+    updateMetrics();
+  }
+
+  /* ── Random graph ────────────────────────────────────────────── */
+  function randomGraph(n) {
+    clearAll();
     resize();
     const W = canvas.width, H = canvas.height;
     const cx = W / 2, cy = H / 2;
-    const r  = Math.min(W, H) * 0.32;
-
+    const r  = Math.min(W, H) * 0.31;
     for (let i = 0; i < n; i++) {
-      const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
-      nodes.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), id: i });
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      nodes.push({ x: Math.round(cx + r * Math.cos(a)), y: Math.round(cy + r * Math.sin(a)) });
     }
-
-    // Spanning chain
+    // Spanning tree to ensure connectivity
     for (let i = 0; i < n - 1; i++) {
       edges.push({ u: i, v: i + 1, w: rand(1, 20), state: 'normal' });
     }
-    edges.push({ u: n - 1, v: 0, w: rand(1, 20), state: 'normal' });
-
-    // Extra random edges
-    const attempts = n * 3;
-    for (let k = 0; k < attempts; k++) {
+    // Extra edges
+    let attempts = n * 4;
+    while (attempts-- > 0) {
       const u = rand(0, n - 1), v = rand(0, n - 1);
-      if (u !== v) {
-        const dup = edges.some(e => (e.u===u&&e.v===v)||(e.u===v&&e.v===u));
-        if (!dup) edges.push({ u, v, w: rand(1, 20), state: 'normal' });
+      if (u !== v && !edges.some(e => (e.u===u&&e.v===v)||(e.u===v&&e.v===u))) {
+        edges.push({ u, v, w: rand(1, 20), state: 'normal' });
       }
     }
-
-    updatePrimStart(); draw();
-    addLog(`Generated random graph: ${n} nodes, ${edges.length} edges`, '');
-    setStatus(`Graph ready — ${n} vertices, ${edges.length} edges`);
-  }
-
-  function clearGraph() {
-    nodes = []; edges = []; selected = null;
-    const el = document.getElementById('mst-result-log');
-    if (el) el.innerHTML = '<span style="color:#475569">Run an algorithm to see results here.</span>';
+    updatePrimSelect();
     draw();
-    updatePrimStart();
-    clearLog();
+    addLog(`Random graph: ${n} nodes, ${edges.length} edges.`, 'info');
+    setStatus(`Graph ready. ${n} nodes, ${edges.length} edges.`);
   }
 
-  function resetGraph() {
-    edges.forEach(e => e.state = 'normal');
+  function resetEdges() {
+    edges.forEach(e => { e.state = 'normal'; });
     draw();
-    const el = document.getElementById('mst-result-log');
-    if (el) el.innerHTML = '<span style="color:#475569">Run an algorithm to see results here.</span>';
-    clearLog();
-    setStatus('Graph reset — edges cleared');
+    const body = _el('mst-result-body');
+    if (body) body.innerHTML = '<span style="color:var(--text-dim);font-size:11px">Run an algorithm to see output here.</span>';
+    clearLog(); resetStats(); updateMetrics();
+    setStatus('Edges reset.');
   }
 
+  function clearAll() {
+    nodes = []; edges = []; selNode = null;
+    resetEdges();
+    draw();
+    updatePrimSelect();
+    setStatus('Graph cleared.');
+  }
+
+  function setPrimStart(n) { primStart = n; draw(); }
+
+  /* ── Public ──────────────────────────────────────────────────── */
   async function run() {
-    if (mstRunning) return;
-    mstRunning = true;
+    if (isRunning) return;
+    isRunning = true;
     State.running = true;
     State.cancel  = false;
     State.paused  = false;
     resetStats();
     State.startTime = performance.now();
-    clearLog();
-    updatePlayBtn(true);
+    clearLog(); setRunBtn(true);
 
-    const algo = State.algo;
-    if (algo === 'kruskal') await runKruskal();
-    else if (algo === 'prim') await runPrim();
+    if (State.algo === 'kruskal') await runKruskal();
+    else if (State.algo === 'prim') await runPrim();
 
     State.elapsedMs = performance.now() - State.startTime;
     State.startTime = 0;
-    mstRunning = false;
+    isRunning = false;
     State.running = false;
-    updatePlayBtn(false);
+    setRunBtn(false);
     updateMetrics();
   }
 
@@ -379,5 +374,5 @@ const MSTModule = (() => {
     randomGraph(7);
   }
 
-  return { init, randomGraph, clearGraph, resetGraph, run };
+  return { init, randomGraph, resetEdges, clearAll, run, setPrimStart };
 })();

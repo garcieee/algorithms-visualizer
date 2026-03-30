@@ -3,227 +3,290 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AlgoKit — Algorithm Analysis Dashboard</title>
+<title>Algorithm Analysis and Simulation Toolkit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;600&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════════════
-     TOP HEADER
-     ═══════════════════════════════════════════════════════════════════ -->
+<!-- ════════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════ -->
 <header id="header">
 
-  <!-- Logo -->
-  <div class="logo">
-    <div class="logo-icon">&lt;/&gt;</div>
-    AlgoKit
-  </div>
-  <div style="font-size:.72rem;color:var(--muted);font-family:var(--mono);margin-left:-18px">v1.0</div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-section="sort">Sorting Algorithms</button>
+    <button class="nav-tab"        data-section="mst">MST Algorithms</button>
+    <button class="nav-tab"        data-section="rec">Recursion Simulation</button>
+  </nav>
 
-  <!-- Divider -->
-  <div style="width:1px;height:24px;background:var(--border);flex-shrink:0"></div>
+  <div class="header-controls">
+    <div class="step-counter" id="step-counter">
+      Step <span class="sc-val" id="sc-cur">0</span> / <span class="sc-val" id="sc-tot">0</span>
+    </div>
 
-  <!-- Section tabs -->
-  <div class="section-tabs">
-    <button class="section-tab active" data-section="sort">Sorting Algorithms</button>
-    <button class="section-tab"        data-section="mst">MST Algorithms</button>
-    <button class="section-tab"        data-section="rec">Recursion Simulation</button>
-  </div>
+    <div class="header-divider"></div>
 
-  <!-- Active algo label -->
-  <div style="font-family:var(--mono);font-size:.8rem;color:var(--muted);white-space:nowrap">
-    <span style="color:var(--muted2)">›</span>
-    <span id="algo-display" style="color:var(--text);margin-left:4px">Bubble Sort</span>
-  </div>
+    <button class="hbtn" id="btn-generate" data-tip="Generate new data (G)">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+      </svg>
+    </button>
 
-  <!-- Step badge -->
-  <div class="step-badge" id="step-badge">Steps <span>0</span></div>
+    <button class="hbtn" id="btn-step" data-tip="Advance one step">
+      <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+        <polygon points="5 3 19 12 5 21 5 3" opacity="0.6"/><line x1="19" y1="3" x2="19" y2="21" stroke="currentColor" stroke-width="2.5"/>
+      </svg>
+    </button>
 
-  <!-- Playback controls -->
-  <div class="playback-controls">
-    <button class="ctrl-btn" id="gen-btn"   data-tip="Generate new data">↺</button>
-    <button class="ctrl-btn" id="step-btn"  data-tip="Step once">▷</button>
-    <button class="ctrl-btn primary" id="run-btn">▶ Run</button>
-    <button class="ctrl-btn" id="reset-btn" data-tip="Reset">⏹</button>
+    <button class="hbtn hbtn-primary" id="btn-run">
+      <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24" id="run-icon">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      <span id="run-label">Run</span>
+    </button>
+
+    <button class="hbtn" id="btn-reset" data-tip="Reset (R)">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+      </svg>
+    </button>
   </div>
 
 </header>
 
-<!-- ═══════════════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
      MAIN LAYOUT
-     ═══════════════════════════════════════════════════════════════════ -->
-<div id="main">
+════════════════════════════════════════════════════════════ -->
+<div id="layout">
 
-  <!-- ── LEFT SIDEBAR ─────────────────────────────────────────────── -->
-  <aside id="sidebar">
+  <!-- ── LEFT PANEL ──────────────────────────────────────── -->
+  <aside id="left-panel">
 
-    <!-- Algorithm List -->
-    <div class="sidebar-section" style="flex:1;overflow-y:auto">
-      <div class="sidebar-label">Algorithms</div>
-      <div class="algo-list" id="algo-list">
-        <!-- Populated by JS -->
+    <!-- Algorithm selector -->
+    <div class="panel-section">
+      <div class="pane-title">Algorithm</div>
+
+      <div class="field-row">
+        <label class="field-label" for="algo-select">Select Algorithm</label>
+        <select class="field-select" id="algo-select">
+          <!-- Populated by JS -->
+        </select>
       </div>
+
+      <div id="algo-description" style="font-size:11px;color:var(--text-dim);line-height:1.55;margin-top:2px;min-height:28px;"></div>
     </div>
 
     <!-- Settings -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">Settings</div>
+    <div class="panel-section" id="sort-settings">
+      <div class="pane-title">Settings</div>
 
-      <div class="control-row">
-        <div class="ctrl-label">
-          Dataset Size <span id="size-display">60</span>
+      <div class="field-row">
+        <label class="field-label" for="size-select">Dataset Size</label>
+        <div class="input-slider-pair">
+          <input class="field-input" type="number" id="size-input" value="60" min="5" max="300">
+          <input class="field-range" type="range"  id="size-range" value="60" min="5" max="300">
         </div>
-        <input type="range" id="size-slider" min="10" max="200" value="60">
       </div>
 
-      <div class="control-row">
-        <div class="ctrl-label">
-          Speed <span id="speed-display">5</span>
-        </div>
-        <input type="range" id="speed-slider" min="1" max="10" value="5">
-      </div>
-
-      <div class="control-row">
-        <div class="ctrl-label">Input Type</div>
-        <select class="ctrl-select" id="dataset-select">
+      <div class="field-row">
+        <label class="field-label" for="type-select">Input Type</label>
+        <select class="field-select" id="type-select">
           <option value="random">Random</option>
-          <option value="sorted">Nearly Sorted</option>
-          <option value="reversed">Reversed</option>
+          <option value="sorted">Nearly Sorted (best case)</option>
+          <option value="reversed">Reversed (worst case)</option>
           <option value="nearly">Mostly Sorted</option>
         </select>
       </div>
 
-      <!-- Prim start node (MST only) -->
-      <div class="control-row" id="prim-start-wrap" style="display:none">
-        <div class="ctrl-label">Prim's Start Node</div>
-        <select class="ctrl-select" id="prim-start-select">
-          <option value="0">0</option>
-        </select>
+      <div class="field-row">
+        <label class="field-label" for="speed-select">Animation Speed</label>
+        <div class="input-slider-pair">
+          <input class="field-input" type="number" id="speed-input" value="5" min="1" max="10">
+          <input class="field-range" type="range"  id="speed-range" value="5" min="1" max="10">
+        </div>
       </div>
 
-      <!-- B input (Rec only) -->
-      <div class="control-row" id="rec-b-wrap" style="display:none">
-        <div class="ctrl-label"><span id="rec-b-label">b value:</span></div>
-        <input type="number" id="rec-b-input" value="18" min="0" max="999"
-               style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.8rem;padding:6px 10px;border-radius:6px;outline:none">
-      </div>
-
-      <div class="action-btns">
-        <button class="action-btn generate" id="gen-btn2"
-                onclick="document.getElementById('gen-btn').click()">↺ Generate</button>
-        <button class="action-btn" onclick="document.getElementById('reset-btn').click()">⏹ Reset</button>
+      <div class="panel-btn-row" style="margin-top:6px">
+        <button class="panel-btn teal" id="panel-generate">Generate</button>
+        <button class="panel-btn"      id="panel-reset">Reset</button>
       </div>
     </div>
 
-    <!-- Complexity -->
-    <div class="sidebar-section">
-      <div class="sidebar-label">Complexity</div>
-      <div class="complexity-grid">
-        <div class="complexity-card">
-          <div class="complexity-label">Best</div>
-          <div class="complexity-value green" id="cx-best">O(n)</div>
-        </div>
-        <div class="complexity-card">
-          <div class="complexity-label">Average</div>
-          <div class="complexity-value red" id="cx-avg">O(n²)</div>
-        </div>
-        <div class="complexity-card">
-          <div class="complexity-label">Worst</div>
-          <div class="complexity-value red" id="cx-worst">O(n²)</div>
-        </div>
-        <div class="complexity-card">
-          <div class="complexity-label">Space</div>
-          <div class="complexity-value green" id="cx-space">O(1)</div>
-        </div>
-        <div class="complexity-card" style="grid-column:span 2">
-          <div class="complexity-label">Stable?</div>
-          <div class="complexity-value green" id="cx-stable">Yes</div>
+    <!-- MST Settings (hidden by default) -->
+    <div class="panel-section" id="mst-settings" style="display:none">
+      <div class="pane-title">Settings</div>
+
+      <div class="field-row">
+        <label class="field-label" for="graph-size-input">Number of Nodes</label>
+        <div class="input-slider-pair">
+          <input class="field-input" type="number" id="graph-size-input" value="7" min="3" max="12">
+          <input class="field-range" type="range"  id="graph-size-range" value="7" min="3" max="12">
         </div>
       </div>
+
+      <div class="field-row" id="prim-start-wrap" style="display:none">
+        <label class="field-label" for="prim-start">Starting Node</label>
+        <select class="field-select" id="prim-start">
+          <option value="0">Node 0</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label" for="speed-select-mst">Animation Speed</label>
+        <div class="input-slider-pair">
+          <input class="field-input" type="number" id="speed-input-mst" value="5" min="1" max="10">
+          <input class="field-range" type="range"  id="speed-range-mst" value="5" min="1" max="10">
+        </div>
+      </div>
+
+      <div class="panel-btn-row" style="margin-top:6px">
+        <button class="panel-btn teal" id="mst-panel-generate">Random Graph</button>
+        <button class="panel-btn"      id="mst-panel-reset">Reset</button>
+      </div>
+    </div>
+
+    <!-- Recursion Settings (hidden by default) -->
+    <div class="panel-section" id="rec-settings" style="display:none">
+      <div class="pane-title">Settings</div>
+
+      <div class="field-row">
+        <label class="field-label" for="rec-n-input">n (input value)</label>
+        <div class="input-slider-pair">
+          <input class="field-input" type="number" id="rec-n-input" value="6" min="0" max="12">
+          <input class="field-range" type="range"  id="rec-n-range" value="6" min="0" max="12">
+        </div>
+      </div>
+
+      <div class="field-row" id="rec-b-row" style="display:none">
+        <label class="field-label" id="rec-b-label" for="rec-b-input">b (second value)</label>
+        <input class="field-input" type="number" id="rec-b-input" value="18" min="0" max="999">
+      </div>
+
+      <div class="field-row">
+        <label class="field-label" for="rec-speed-input">Animation Speed</label>
+        <div class="input-slider-pair">
+          <input class="field-input" type="number" id="rec-speed-input" value="5" min="1" max="10">
+          <input class="field-range" type="range"  id="rec-speed-range" value="5" min="1" max="10">
+        </div>
+      </div>
+
+      <div class="panel-btn-row" style="margin-top:6px">
+        <button class="panel-btn" id="rec-panel-reset">Clear</button>
+      </div>
+    </div>
+
+    <!-- Complexity reference -->
+    <div class="panel-section grow" id="cx-section">
+      <div class="pane-title">Complexity</div>
+      <table class="cx-table">
+        <tr>
+          <td>Best case</td>
+          <td class="cx-good" id="cx-best">O(n)</td>
+        </tr>
+        <tr>
+          <td>Average case</td>
+          <td class="cx-slow" id="cx-avg">O(n²)</td>
+        </tr>
+        <tr>
+          <td>Worst case</td>
+          <td class="cx-bad"  id="cx-worst">O(n²)</td>
+        </tr>
+        <tr>
+          <td>Space</td>
+          <td class="cx-good" id="cx-space">O(1)</td>
+        </tr>
+        <tr>
+          <td>Stable</td>
+          <td class="cx-good" id="cx-stable">Yes</td>
+        </tr>
+      </table>
     </div>
 
   </aside>
 
-  <!-- ── CENTER CANVAS ────────────────────────────────────────────── -->
-  <div id="center">
+  <!-- ── CENTER CANVAS ───────────────────────────────────── -->
+  <main id="canvas-wrap">
 
-    <!-- MST overlay controls -->
-    <div id="mst-controls-overlay" style="display:none">
-      <button class="mst-ctrl-btn" id="mst-random-btn">⊞ Random Graph</button>
-      <button class="mst-ctrl-btn" id="mst-reset-btn2">↺ Reset Edges</button>
-      <button class="mst-ctrl-btn" id="mst-clear-btn">✕ Clear All</button>
-      <span style="font-family:var(--mono);font-size:.72rem;color:var(--muted);align-self:center;margin-left:4px">
-        Click empty space to add node · Click two nodes to connect
-      </span>
+    <!-- Toolbar above canvas -->
+    <div id="canvas-toolbar">
+      <div class="algo-breadcrumb">
+        <span id="tb-section">Sorting</span>
+        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="crumb-algo" id="tb-algo">Bubble Sort</span>
+      </div>
+
+      <!-- MST specific toolbar buttons -->
+      <div class="toolbar-right" id="mst-toolbar" style="display:none">
+        <button class="tbtn" id="mst-random">Random Graph</button>
+        <button class="tbtn" id="mst-reset-edges">Reset Edges</button>
+        <button class="tbtn" id="mst-clear">Clear All</button>
+      </div>
     </div>
 
-    <!-- Main canvas area -->
-    <div id="canvas-area">
-      <!-- Sorting bars canvas -->
-      <canvas id="sort-canvas"></canvas>
+    <!-- Canvas for sort + MST -->
+    <canvas id="vis-canvas"></canvas>
 
-      <!-- MST graph canvas -->
-      <canvas id="mst-canvas"></canvas>
+    <!-- Recursion trace (replaces canvas) -->
+    <div id="rec-panel">
+      <div class="rec-scroll" id="rec-trace">
+        <span style="color:#9aa0b0">Select a recursive function and click Run.</span>
+      </div>
+    </div>
 
-      <!-- Recursion call tree -->
-      <div id="rec-output" style="display:none;position:absolute;inset:0;flex-direction:column;overflow:hidden">
-        <div class="rec-trace" id="rec-trace">
-          <span style="color:var(--muted);font-family:var(--mono)">Choose a function and click ▶ Run…</span>
+    <!-- MST hint overlay -->
+    <div class="canvas-hint" id="mst-hint">
+      Click empty area to add a node. Click two nodes to connect them with an edge.
+    </div>
+
+    <!-- Status bar -->
+    <div id="statusbar">
+      <div class="sb-item">
+        <div class="sb-dot idle" id="sb-dot"></div>
+        <span class="sb-msg" id="sb-msg">Ready</span>
+      </div>
+      <div class="sb-item sb-right">
+        <span style="color:var(--text-label)">
+          Algorithm Analysis and Simulation Toolkit &nbsp; | &nbsp; Term 2, SY 2025-2026
+        </span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── RIGHT PANEL ─────────────────────────────────────── -->
+  <aside id="right-panel">
+
+    <!-- Metrics -->
+    <div class="panel-section" style="padding:0">
+      <div class="metrics-grid">
+        <div class="metric-cell">
+          <div class="m-label">Time</div>
+          <div class="m-value" id="m-time">0</div>
+          <div class="m-sub">ms</div>
+        </div>
+        <div class="metric-cell">
+          <div class="m-label">Comparisons</div>
+          <div class="m-value" id="m-comps">0</div>
+          <div class="m-sub">operations</div>
+        </div>
+        <div class="metric-cell">
+          <div class="m-label">Swaps</div>
+          <div class="m-value" id="m-swaps">0</div>
+          <div class="m-sub">writes</div>
+        </div>
+        <div class="metric-cell">
+          <div class="m-label">Steps</div>
+          <div class="m-value" id="m-steps">0</div>
+          <div class="m-sub">progress</div>
         </div>
       </div>
     </div>
 
-    <!-- Status bar -->
-    <div id="status-bar">
-      <div class="status-item">
-        <div class="status-dot" id="status-dot"></div>
-        <span class="status-msg" id="status-msg">Ready</span>
-      </div>
-      <div class="status-item" style="margin-left:auto">
-        <span style="font-family:var(--mono);font-size:.72rem;color:var(--muted)">AlgoKit v1.0 &nbsp;·&nbsp; Algorithms &amp; Complexity &nbsp;·&nbsp; Term 2, SY 2025–2026</span>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ── RIGHT PANEL ───────────────────────────────────────────────── -->
-  <aside id="right-panel">
-
-    <!-- Metrics grid -->
-    <div style="padding:14px 14px 6px;flex-shrink:0">
-      <div style="font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px">
-        Profiler
-        <span style="flex:1;height:1px;background:var(--border)"></span>
-      </div>
-    </div>
-    <div class="metric-grid">
-      <div class="metric-card cyan">
-        <div class="metric-label">Time</div>
-        <div class="metric-value" id="m-time">0 ms</div>
-        <div class="metric-sub">elapsed</div>
-      </div>
-      <div class="metric-card amber">
-        <div class="metric-label">Comparisons</div>
-        <div class="metric-value" id="m-comps">0</div>
-        <div class="metric-sub">total ops</div>
-      </div>
-      <div class="metric-card green">
-        <div class="metric-label">Swaps</div>
-        <div class="metric-value" id="m-swaps">0</div>
-        <div class="metric-sub">writes</div>
-      </div>
-      <div class="metric-card purple">
-        <div class="metric-label">Steps</div>
-        <div class="metric-value" id="m-steps">0</div>
-        <div class="metric-sub">progress</div>
-      </div>
-    </div>
-
-    <!-- Progress bar -->
-    <div class="progress-wrap">
-      <div class="progress-label">
+    <!-- Progress -->
+    <div class="progress-section">
+      <div class="progress-header">
         <span>Progress</span>
         <span id="progress-pct">0%</span>
       </div>
@@ -232,26 +295,23 @@
       </div>
     </div>
 
-    <!-- MST Result (shown only in MST section) -->
-    <div id="mst-result-section" style="display:none;border-top:1px solid var(--border);padding:14px;flex-shrink:0">
-      <div style="font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px">
-        MST Result
-        <span style="flex:1;height:1px;background:var(--border)"></span>
-      </div>
-      <div id="mst-result-log"
-           style="font-family:var(--mono);font-size:.78rem;line-height:1.85;color:var(--muted)">
-        <span style="color:var(--muted)">Run an algorithm to see results here.</span>
+    <!-- MST Result pane -->
+    <div id="mst-result-pane">
+      <div class="pane-title" style="padding:14px 14px 0">MST Result</div>
+      <div id="mst-result-body">
+        <span style="color:var(--text-dim);font-size:11px">Run an algorithm to see output here.</span>
       </div>
     </div>
 
-    <!-- Log output -->
-    <div id="log-section">
-      <div class="log-header">
-        Output Log
-        <button class="log-clear-btn" id="log-clear-btn">clear</button>
-      </div>
-      <div id="log-output">
-        <div class="log-line"><span class="log-tag">[INF]</span><span>Dashboard ready. Select an algorithm.</span></div>
+    <!-- Log -->
+    <div class="log-header-row">
+      <span class="log-title">Output Log</span>
+      <button class="log-clear" id="btn-log-clear">Clear</button>
+    </div>
+    <div id="log-body">
+      <div class="log-entry log-info">
+        <span class="log-tag">INF</span>
+        <span>Ready. Select an algorithm and click Run.</span>
       </div>
     </div>
 
@@ -259,7 +319,6 @@
 
 </div>
 
-<!-- ── SCRIPTS ─────────────────────────────────────────────────────── -->
 <script src="utils.js"></script>
 <script src="sort.js"></script>
 <script src="mst.js"></script>
