@@ -40,6 +40,55 @@ const SortModule = (() => {
   function draw() {
     resize();
     const W = canvas.width, H = canvas.height;
+    
+    const vizType = State.vizType || 'bar';
+    const compareList = Array.from(comparing);
+    const swapList = Array.from(swapping);
+    
+    // Use the appropriate visualization function
+    if (vizType === 'line') {
+      Visualizations.drawLineGraph(ctx, arr, W, H, {
+        comparisons: compareList,
+        swaps: swapList,
+        active: swapping.size > 0 ? swapping : comparing,
+        sorted: sorted
+      });
+    } else if (vizType === 'scatter') {
+      Visualizations.drawScatterPlot(ctx, arr, W, H, {
+        comparisons: compareList,
+        swaps: swapList,
+        active: swapping.size > 0 ? swapping : comparing,
+        sorted: sorted
+      });
+    } else if (vizType === 'pie') {
+      Visualizations.drawCircularChart(ctx, arr, W, H, {
+        comparisons: compareList,
+        swaps: swapList,
+        active: swapping.size > 0 ? swapping : comparing,
+        sorted: sorted
+      });
+    } else if (vizType === 'bubble') {
+      Visualizations.drawBubbleChart(ctx, arr, W, H, {
+        comparisons: compareList,
+        swaps: swapList,
+        active: swapping.size > 0 ? swapping : comparing,
+        sorted: sorted
+      });
+    } else if (vizType === 'histogram') {
+      Visualizations.drawHistogram(ctx, arr, W, H, {
+        comparisons: compareList,
+        swaps: swapList,
+        active: swapping.size > 0 ? swapping : comparing,
+        sorted: sorted
+      });
+    } else {
+      // Default bar chart
+      drawBarsDefault();
+    }
+  }
+
+  function drawBarsDefault() {
+    const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
     if (!arr.length) return;
 

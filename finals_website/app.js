@@ -274,6 +274,14 @@ document.addEventListener('DOMContentLoaded', () => {
     MSTModule.setPrimStart(parseInt(this.value));
   });
 
+  /* ── Visualization type select ──────────────────────────────── */
+  _el('viz-type-select')?.addEventListener('change', function() {
+    State.vizType = this.value;
+    // Trigger redraw
+    if (State.section === 'sort') SortModule.redraw();
+    else if (State.section === 'mst') MSTModule.redraw();
+  });
+
   /* ── Metrics ticker ─────────────────────────────────────────── */
   setInterval(() => {
     if (State.running && State.startTime) updateMetrics();

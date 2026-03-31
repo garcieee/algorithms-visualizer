@@ -374,5 +374,5 @@ const MSTModule = (() => {
     resize();
   }
 
-  return { init, randomGraph, resetEdges, clearAll, run, setPrimStart };
+  return { init, randomGraph, resetEdges, clearAll, run, setPrimStart, redraw: draw };
 })();

@@ -44,6 +44,7 @@ const State = {
   totalSteps: 0,
   startTime:  0,
   elapsedMs:  0,
+  vizType:    'bar',  // New: visualization type
 };
 
 function resetStats() {
