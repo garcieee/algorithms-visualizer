@@ -41,49 +41,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ── Section switching ──────────────────────────────────────── */
   function switchSection(key) {
-    if (State.running) stopAll();
-    State.section = key;
-
-    // Nav tabs
-    document.querySelectorAll('.nav-tab').forEach(b =>
-      b.classList.toggle('active', b.dataset.section === key)
-    );
-
-    // Settings panels
-    _el('sort-settings').style.display = key === 'sort' ? '' : 'none';
-    _el('mst-settings').style.display  = key === 'mst'  ? '' : 'none';
-    _el('rec-settings').style.display  = key === 'rec'  ? '' : 'none';
-
-    // Canvas vs recursion panel
-    const canvas   = _el('vis-canvas');
-    const recPanel = _el('rec-panel');
-    const mstHint  = _el('mst-hint');
-    const mstTbar  = _el('mst-toolbar');
-    const mstResult = _el('mst-result-pane');
-
-    if (key === 'rec') {
-      canvas.style.display   = 'none';
-      recPanel.classList.add('visible');
-    } else {
-      canvas.style.display   = 'block';
-      recPanel.classList.remove('visible');
-    }
-
-    mstHint.classList.toggle('visible', key === 'mst');
-    mstTbar.style.display   = key === 'mst' ? 'flex' : 'none';
-    mstResult.classList.toggle('visible', key === 'mst');
-
-    // Populate algo dropdown
-    buildAlgoSelect(key);
-
-    // Section breadcrumb
-    const secLabels = { sort:'Sorting', mst:'MST', rec:'Recursion' };
-    const tbSection = _el('tb-section');
-    if (tbSection) tbSection.textContent = secLabels[key] || key;
-
-    resetStats(); updateMetrics(); clearLog();
-    setStatus('Ready');
+    // Hard stop anything running
+    State.cancel  = true;
+    State.running = false;
+    State.paused  = false;
     setRunBtn(false);
+
+    // Small delay so async loops can check cancel before we redraw
+    setTimeout(() => {
+      State.cancel  = false;
+      State.section = key;
+
+      // Nav tabs
+      document.querySelectorAll('.nav-tab').forEach(b =>
+        b.classList.toggle('active', b.dataset.section === key)
+      );
+
+      // Settings panels
+      _el('sort-settings').style.display = key === 'sort' ? '' : 'none';
+      _el('mst-settings').style.display  = key === 'mst'  ? '' : 'none';
+      _el('rec-settings').style.display  = key === 'rec'  ? '' : 'none';
+
+      // Canvas vs recursion panel
+      const canvas    = _el('vis-canvas');
+      const recPanel  = _el('rec-panel');
+      const mstHint   = _el('mst-hint');
+      const mstTbar   = _el('mst-toolbar');
+      const mstResult = _el('mst-result-pane');
+
+      // Always wipe the canvas immediately
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (key === 'rec') {
+        canvas.style.display = 'none';
+        recPanel.classList.add('visible');
+      } else {
+        canvas.style.display = 'block';
+        recPanel.classList.remove('visible');
+      }
+
+      mstHint.classList.toggle('visible', key === 'mst');
+      mstTbar.style.display = key === 'mst' ? 'flex' : 'none';
+      mstResult.classList.toggle('visible', key === 'mst');
+
+      // Section breadcrumb
+      const secLabels = { sort:'Sorting', mst:'MST', rec:'Recursion' };
+      const tbSection = _el('tb-section');
+      if (tbSection) tbSection.textContent = secLabels[key] || key;
+
+      // Reset stats + log
+      resetStats(); updateMetrics(); clearLog();
+      setStatus('Ready');
+
+      // Populate algo dropdown
+      buildAlgoSelect(key);
+
+      // Initialize the new section fresh
+      if (key === 'sort') {
+        SortModule.generate();
+      } else if (key === 'mst') {
+        const n = clamp(parseInt(_el('graph-size-input')?.value || '7'), 3, 12);
+        MSTModule.randomGraph(n);
+      } else if (key === 'rec') {
+        RecModule.reset();
+      }
+    }, 40);
   }
 
   /* ── Algo select dropdown ───────────────────────────────────── */
@@ -157,6 +180,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'g' || e.key === 'G') _el('btn-generate')?.click();
   });
 
+  /* ── Bar style + show values (sorting visualization options) ── */
+  _el('bar-style-select')?.addEventListener('change', () => {
+    if (!State.running && State.section === 'sort') SortModule.redraw();
+  });
+  _el('show-values-toggle')?.addEventListener('change', () => {
+    if (!State.running && State.section === 'sort') SortModule.redraw();
+  });
+
   /* ── Wire algo dropdown ─────────────────────────────────────── */
   _el('algo-select').addEventListener('change', function() {
     selectAlgo(this.value, State.section);
@@ -181,8 +212,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   _el('btn-generate').addEventListener('click', () => {
-    if (State.section === 'sort') { stopAll(); setTimeout(() => SortModule.generate(), 50); }
-    else if (State.section === 'mst') {
+    if (State.section === 'sort') {
+      State.cancel = true; State.running = false; State.paused = false;
+      setTimeout(() => { State.cancel = false; SortModule.generate(); }, 50);
+    } else if (State.section === 'mst') {
       const n = clamp(parseInt(_el('graph-size-input')?.value || '7'), 3, 12);
       MSTModule.randomGraph(n);
     } else if (State.section === 'rec') {
@@ -247,10 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 120);
 
   /* ── Init ───────────────────────────────────────────────────── */
-  switchSection('sort');
-  SortModule.init();
-  MSTModule.init();
-  RecModule.init();
+  SortModule.init();   // registers event listeners only
+  MSTModule.init();    // registers click handler only
+  RecModule.init();    // sets placeholder text
+  switchSection('sort');  // triggers fresh generate + UI setup
 
   setStatus('Ready. Select an algorithm and click Run.');
 });

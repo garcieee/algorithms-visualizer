@@ -10,6 +10,15 @@ const SortModule = (() => {
   let swapping  = new Set();
   let sorted    = new Set();
 
+  /* ── Bar style & display options ────────────────────────────── */
+  // These read live from the DOM so changing the dropdown updates instantly
+  function getBarStyle() {
+    return document.getElementById('bar-style-select')?.value || 'solid';
+  }
+  function getShowValues() {
+    return document.getElementById('show-values-toggle')?.checked !== false;
+  }
+
   /* ── Colors ─────────────────────────────────────────────────── */
   const COL = {
     bar:     '#c5cad8',
@@ -34,6 +43,8 @@ const SortModule = (() => {
     ctx.clearRect(0, 0, W, H);
     if (!arr.length) return;
 
+    const style    = getBarStyle();
+    const showVals = getShowValues();
     const n    = arr.length;
     const maxV = Math.max(...arr) || 1;
     const gap  = n > 150 ? 0 : n > 80 ? 0.5 : 1;
@@ -46,31 +57,48 @@ const SortModule = (() => {
       const bh = Math.max(2, (arr[i] / maxV) * usableH);
       const y  = H - bh - 4;
 
-      let color = COL.bar;
-      if (sorted.has(i))   color = COL.sorted;
-      if (swapping.has(i)) color = COL.swap;
-      if (comparing.has(i) && !swapping.has(i)) color = COL.compare;
+      // Determine base color
+      let baseColor = COL.bar;
+      if (sorted.has(i))                              baseColor = COL.sorted;
+      if (swapping.has(i))                            baseColor = COL.swap;
+      if (comparing.has(i) && !swapping.has(i))      baseColor = COL.compare;
 
-      ctx.fillStyle = color;
-
-      if (bw >= 2) {
-        const r = Math.min(2, bw * 0.3);
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + bw - r, y);
-        ctx.quadraticCurveTo(x + bw, y, x + bw, y + r);
-        ctx.lineTo(x + bw, H - 4);
-        ctx.lineTo(x, H - 4);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-        ctx.fill();
+      // Apply style
+      if (style === 'gradient') {
+        const grad = ctx.createLinearGradient(x, y, x, H - 4);
+        grad.addColorStop(0, lighten(baseColor, 0.35));
+        grad.addColorStop(1, baseColor);
+        ctx.fillStyle = grad;
       } else {
-        ctx.fillRect(x, y, Math.max(1, bw), bh);
+        ctx.fillStyle = baseColor;
       }
 
-      // Value label for wider bars
-      if (bw >= 16 && n <= 60) {
+      // Draw bar shape
+      if (style === 'outlined') {
+        // Hollow outline only
+        ctx.strokeStyle = baseColor;
+        ctx.lineWidth   = bw >= 4 ? 1.5 : 1;
+        ctx.fillStyle   = baseColor + '22';
+        if (bw >= 2) {
+          const rad = Math.min(2, bw * 0.3);
+          roundRect(ctx, x, y, bw, bh, rad);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(x, y, Math.max(1, bw), bh);
+        }
+      } else {
+        if (bw >= 2) {
+          const rad = Math.min(2, bw * 0.3);
+          roundRect(ctx, x, y, bw, bh, rad);
+          ctx.fill();
+        } else {
+          ctx.fillRect(x, y, Math.max(1, bw), bh);
+        }
+      }
+
+      // Value labels
+      if (showVals && bw >= 16 && n <= 60) {
         ctx.fillStyle = (swapping.has(i) || comparing.has(i)) ? '#fff' : '#8892aa';
         ctx.font = `${Math.min(11, bw * 0.65)}px Source Code Pro, monospace`;
         ctx.textAlign = 'center';
@@ -78,6 +106,26 @@ const SortModule = (() => {
         ctx.fillText(arr[i], x + bw / 2, y - 2);
       }
     }
+  }
+
+  // Helpers
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h);
+    ctx.lineTo(x, y + h);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function lighten(hex, amt) {
+    // Simple hex lighten by blending toward white
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    const lr = Math.round(r + (255-r)*amt), lg = Math.round(g + (255-g)*amt), lb = Math.round(b + (255-b)*amt);
+    return `rgb(${lr},${lg},${lb})`;
   }
 
   /* ── Helpers ────────────────────────────────────────────────── */
@@ -360,17 +408,19 @@ const SortModule = (() => {
 
   /* ── Public API ─────────────────────────────────────────────── */
   function generate() {
-    State.cancel = true;
+    // Called either from switchSection (already cancelled) or button press
+    State.cancel  = true;
     State.running = false;
+    State.paused  = false;
     setTimeout(() => {
       State.cancel = false;
       arr = makeDataset(State.size, State.dataset);
       comparing = new Set(); swapping = new Set(); sorted = new Set();
       resetStats(); updateMetrics(); clearLog();
       resize(); draw();
-      setStatus(`${arr.length} elements generated (${State.dataset})`);
+      setStatus(`${arr.length} elements generated (${State.dataset}).`);
       addLog(`Generated ${arr.length}-element ${State.dataset} dataset.`, 'info');
-    }, 30);
+    }, 20);
   }
 
   async function run() {
@@ -414,15 +464,13 @@ const SortModule = (() => {
   }
 
   function init() {
-    // Wire up dataset type select
+    // Wire up dataset type select (event listener only; generate called by switchSection)
     const typeSelect = _el('type-select');
     if (typeSelect) typeSelect.addEventListener('change', function() {
       State.dataset = this.value;
       if (!State.running) generate();
     });
-
-    generate();
   }
 
-  return { init, generate, run };
+  return { init, generate, run, redraw: draw };
 })();

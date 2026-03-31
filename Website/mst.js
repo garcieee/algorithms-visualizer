@@ -370,8 +370,8 @@ const MSTModule = (() => {
   }
 
   function init() {
+    // Canvas click handler only; randomGraph called by switchSection
     resize();
-    randomGraph(7);
   }
 
   return { init, randomGraph, resetEdges, clearAll, run, setPrimStart };

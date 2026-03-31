@@ -108,7 +108,24 @@
         </div>
       </div>
 
-      <div class="panel-btn-row" style="margin-top:6px">
+      <div class="field-row">
+        <label class="field-label" for="bar-style-select">Bar Style</label>
+        <select class="field-select" id="bar-style-select">
+          <option value="solid">Solid</option>
+          <option value="gradient">Gradient</option>
+          <option value="outlined">Outlined</option>
+        </select>
+      </div>
+
+      <div class="toggle-row">
+        <label class="field-label">Show Values</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="show-values-toggle" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+
+      <div class="panel-btn-row" style="margin-top:8px">
         <button class="panel-btn teal" id="panel-generate">Generate</button>
         <button class="panel-btn"      id="panel-reset">Reset</button>
       </div>
@@ -248,7 +265,7 @@
       </div>
       <div class="sb-item sb-right">
         <span style="color:var(--text-label)">
-          Algorithm Analysis and Simulation Toolkit &nbsp; | &nbsp; Term 2, SY 2025-2026
+          Algorithm Analysis and Simulation Toolkit &nbsp;|&nbsp; Term 2, SY 2025-2026
         </span>
       </div>
     </div>
