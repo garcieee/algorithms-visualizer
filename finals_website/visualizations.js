@@ -213,7 +213,7 @@ const Visualizations = {
   },
 
   /**
-   * Draw circular/pie chart
+   * Draw circular/pie chart with index and percentage labels
    */
   drawCircularChart(ctx, arr, w, h, { comparisons = [], swaps = [], active = new Set(), sorted = new Set() } = {}) {
     ctx.clearRect(0, 0, w, h);
@@ -223,36 +223,49 @@ const Visualizations = {
     
     const centerX = w / 2;
     const centerY = h / 2;
-    const radius = Math.min(w, h) / 2 - 40;
-    
+    const radius = Math.min(w, h) / 2 - 50;
     const total = arr.reduce((a, b) => a + b, 0);
+    
     let currentAngle = -Math.PI / 2;
     
-    // Colors for segments
+    // Colors for segments (consistent with other visualizations)
     const colors = [
       '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', 
       '#ef4444', '#8b5cf6', '#ec4899', '#f97316'
     ];
     
+    // Draw legend at top
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    const legendY = 15;
+    ctx.fillText('Legend: ', 20, legendY);
+    ctx.fillText('█ Sorted (Green)', 80, legendY);
+    ctx.fillText('█ Active (Pink)', 220, legendY);
+    ctx.fillText('█ Compared (Yellow)', 350, legendY);
+    
+    // Draw each slice
     for (let i = 0; i < n; i++) {
       const sliceAngle = (arr[i] / total) * Math.PI * 2;
+      const percentage = ((arr[i] / total) * 100).toFixed(1);
       
       let color = colors[i % colors.length];
+      let opacity = 0.6;
       
+      // Determine color and opacity based on state
       if (sorted.has(i)) {
-        ctx.globalAlpha = 1;
         color = '#10b981';
-      } else if (swaps.includes(i)) {
-        ctx.globalAlpha = 0.8;
-      } else if (comparisons.includes(i)) {
-        ctx.globalAlpha = 0.7;
+        opacity = 1;
       } else if (active.has(i)) {
-        ctx.globalAlpha = 0.9;
-      } else {
-        ctx.globalAlpha = 0.6;
+        color = '#ec4899';
+        opacity = 0.9;
+      } else if (swaps.includes(i) || comparisons.includes(i)) {
+        color = '#fbbf24';
+        opacity = 0.8;
       }
       
       // Draw slice
+      ctx.globalAlpha = opacity;
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.moveTo(centerX, centerY);
@@ -261,21 +274,36 @@ const Visualizations = {
       ctx.fill();
       
       // Border
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
       ctx.lineWidth = 2;
       ctx.stroke();
       
-      // Label
+      // Labels: value, index, and percentage
       const labelAngle = currentAngle + sliceAngle / 2;
-      const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
-      const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+      const labelRadius = radius * 0.65;
+      const labelX = centerX + Math.cos(labelAngle) * labelRadius;
+      const labelY = centerY + Math.sin(labelAngle) * labelRadius;
       
-      ctx.globalAlpha = 1;
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 11px monospace';
+      ctx.font = 'bold 12px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      
+      // Show value on inner label
       ctx.fillText(arr[i], labelX, labelY);
+      
+      // Show index below value
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#e0e0e0';
+      ctx.fillText(`idx:${i}`, labelX, labelY + 12);
+      
+      // Show percentage on outer edge
+      const percentX = centerX + Math.cos(labelAngle) * (radius + 20);
+      const percentY = centerY + Math.sin(labelAngle) * (radius + 20);
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#aaa';
+      ctx.fillText(`${percentage}%`, percentX, percentY);
       
       currentAngle += sliceAngle;
     }
@@ -354,7 +382,7 @@ const Visualizations = {
   },
 
   /**
-   * Draw histogram style chart
+   * Draw histogram with sorted bins, range labels, and frequency information
    */
   drawHistogram(ctx, arr, w, h, { comparisons = [], swaps = [], active = new Set(), sorted = new Set() } = {}) {
     ctx.clearRect(0, 0, w, h);
@@ -362,27 +390,44 @@ const Visualizations = {
     const n = arr.length;
     if (n === 0) return;
     
-    // Create frequency bins
-    const binCount = Math.min(20, Math.ceil(Math.sqrt(n)));
-    const maxVal = Math.max(...arr);
+    // Calculate statistics
     const minVal = Math.min(...arr);
-    const binWidth = (maxVal - minVal) || 1;
-    const bins = Array(binCount).fill(0);
+    const maxVal = Math.max(...arr);
+    const mean = arr.reduce((a, b) => a + b, 0) / n;
     
-    arr.forEach(val => {
-      const binIdx = Math.floor(((val - minVal) / binWidth) * (binCount - 0.01));
-      bins[binIdx]++;
+    // Create bins with clearer ranges
+    const binCount = Math.min(12, Math.ceil(Math.sqrt(n)));
+    const binSize = ((maxVal - minVal) || 1) / binCount;
+    
+    // Create bin objects with metadata
+    const bins = Array(binCount).fill(0).map((_, i) => ({
+      index: i,
+      start: minVal + i * binSize,
+      end: minVal + (i + 1) * binSize,
+      count: 0,
+      indices: []
+    }));
+    
+    // Fill bins and track which original indices go into each
+    arr.forEach((val, idx) => {
+      let binIdx = Math.floor((val - minVal) / binSize);
+      if (binIdx >= binCount) binIdx = binCount - 1;
+      bins[binIdx].count++;
+      bins[binIdx].indices.push(idx);
     });
     
-    const maxBinHeight = Math.max(...bins);
-    const padding = 40;
+    // Find max frequency for scaling
+    const maxFreq = Math.max(...bins.map(b => b.count));
+    
+    // Layout
+    const padding = 60;
     const graphW = Math.max(1, w - padding * 2);
     const graphH = Math.max(1, h - padding * 2);
     const barW = graphW / binCount;
     
-    // Draw axes
+    // ─── DRAW AXES ───
     ctx.strokeStyle = '#888';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(padding, h - padding);
     ctx.lineTo(w - padding, h - padding);
@@ -393,7 +438,7 @@ const Visualizations = {
     ctx.lineTo(padding, h - padding);
     ctx.stroke();
     
-    // Draw grid
+    // ─── DRAW GRID ───
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 5; i++) {
@@ -404,20 +449,96 @@ const Visualizations = {
       ctx.stroke();
     }
     
-    // Draw histogram bars
+    // ─── DRAW HISTOGRAM BARS ───
     for (let i = 0; i < binCount; i++) {
-      const barH = (bins[i] / maxBinHeight) * graphH;
+      const bin = bins[i];
+      const barH = (bin.count / maxFreq) * graphH;
       const x = padding + i * barW;
       const y = h - padding - barH;
       
-      ctx.fillStyle = '#3b82f6';
-      ctx.globalAlpha = 0.7;
-      ctx.fillRect(x, y, Math.max(1, barW - 1), barH);
+      // Determine bar color based on indices in this bin
+      let color = '#3b82f6';
+      let allSorted = false;
       
+      if (bin.indices.length > 0) {
+        // Check state of indices in this bin
+        allSorted = bin.indices.every(idx => sorted.has(idx));
+        if (allSorted) {
+          color = '#10b981';
+        } else if (bin.indices.some(idx => active.has(idx))) {
+          color = '#ec4899';
+        } else if (bin.indices.some(idx => comparisons.includes(idx) || swaps.includes(idx))) {
+          color = '#fbbf24';
+        }
+      }
+      
+      // Draw bar
+      ctx.fillStyle = color;
+      ctx.globalAlpha = allSorted ? 1 : 0.75;
+      ctx.fillRect(x + 1, y, Math.max(1, barW - 2), barH);
+      
+      // Border
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, Math.max(1, barW - 1), barH);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + 1, y, Math.max(1, barW - 2), barH);
+      
+      // Frequency count label on top of bar
+      if (bin.count > 0) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(bin.count, x + barW / 2, y - 3);
+      }
+      
+      // Range label below x-axis (every other bin to avoid crowding)
+      if (i % 2 === 0 || binCount <= 6) {
+        ctx.fillStyle = '#aaa';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const rangeLabel = `${bin.start.toFixed(0)}-${bin.end.toFixed(0)}`;
+        ctx.fillText(rangeLabel, x + barW / 2, h - padding + 5);
+      }
     }
+    
+    // ─── DRAW AXIS LABELS ───
+    ctx.fillStyle = '#aaa';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    
+    // Y-axis labels (frequency scale)
+    for (let i = 0; i <= 5; i++) {
+      const y = h - padding - (graphH * i / 5);
+      const freq = Math.round((maxFreq * i) / 5);
+      ctx.fillText(freq.toString(), padding - 10, y);
+    }
+    
+    // Y-axis label
+    ctx.save();
+    ctx.translate(15, h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#888';
+    ctx.font = '10px monospace';
+    ctx.fillText('Frequency (count)', 0, 0);
+    ctx.restore();
+    
+    // X-axis label
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#888';
+    ctx.font = '10px monospace';
+    ctx.fillText('Value Range (bins)', w / 2, h - 15);
+    
+    // ─── DRAW SUMMARY INFO ───
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`Data: min=${minVal} max=${maxVal} mean=${mean.toFixed(1)} n=${n}`, 20, 5);
+    ctx.fillText(`Bins=${binCount} | ▣ Green=Sorted | ▣ Pink=Active | ▣ Yellow=Compared`, 20, 18);
   }
 };
