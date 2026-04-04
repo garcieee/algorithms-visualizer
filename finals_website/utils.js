@@ -73,7 +73,7 @@ function updateMetrics() {
 
   if (State.totalSteps > 0) {
     _setMetric('m-steps', `${State.steps}/${State.totalSteps}`);
-    const pct = Math.round(State.steps / State.totalSteps * 100);
+    const pct = Math.min(100, Math.round(State.steps / State.totalSteps * 100));
     _el('progress-fill').style.width = pct + '%';
     _el('progress-pct').textContent  = pct + '%';
   } else {

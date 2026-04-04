@@ -153,14 +153,18 @@ const RecModule = (() => {
       if (!State.cancel) await appendLine(`<span class="c-result">Result = ${result}</span>`);
 
     } else if (algo === 'hanoi') {
-      State.totalSteps = Math.pow(2, safeN) - 1;
       if (safeN <= 4) {
+        // Accurate line counts: 1 outer header + headers for each hanoi(k≤3) call + moves
+        // n=1:3, n=2:7, n=3:15, n=4:30
+        const hanoiLineCounts = [0, 3, 7, 15, 30];
+        State.totalSteps = hanoiLineCounts[safeN] || (Math.pow(2, safeN) - 1);
         await appendLine(`<span class="c-fn">Tower of Hanoi (${safeN} disks, A &rarr; C)</span>`);
         await hanoi(safeN, 'A', 'B', 'C', 1);
       } else {
-        // For larger n show moves directly
+        // For larger n show moves directly; totalSteps = header + moves + summary
         await appendLine(`<span class="c-fn">Tower of Hanoi (${safeN} disks)</span>`);
         const moves = getAllHanoiMoves(safeN);
+        State.totalSteps = moves.length + 2;
         for (const m of moves) {
           if (State.cancel) break;
           while (State.paused && !State.cancel) await sleep(50);
@@ -184,6 +188,7 @@ const RecModule = (() => {
 
     State.elapsedMs = performance.now() - State.startTime;
     State.startTime = 0;
+    if (!State.cancel && State.totalSteps > 0) State.steps = State.totalSteps;
     isRunning       = false;
     State.running   = false;
     setRunBtn(false);

@@ -74,13 +74,6 @@ const SortModule = (() => {
         active: swapping.size > 0 ? swapping : comparing,
         sorted: sorted
       });
-    } else if (vizType === 'histogram') {
-      Visualizations.drawHistogram(ctx, arr, W, H, {
-        comparisons: compareList,
-        swaps: swapList,
-        active: swapping.size > 0 ? swapping : comparing,
-        sorted: sorted
-      });
     } else {
       // Default bar chart
       drawBarsDefault();
@@ -504,6 +497,7 @@ const SortModule = (() => {
     if (!State.cancel) {
       comparing = new Set(); swapping = new Set();
       sorted = new Set(arr.map((_, i) => i));
+      if (State.totalSteps > 0) State.steps = State.totalSteps;
       draw(); updateMetrics();
       setRunBtn(false);
       const msg = `Done. ${fmtNum(State.comps)} comparisons, ${fmtNum(State.swaps)} swaps, ${State.elapsedMs.toFixed(1)} ms.`;

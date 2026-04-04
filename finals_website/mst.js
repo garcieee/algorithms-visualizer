@@ -235,6 +235,7 @@ const MSTModule = (() => {
     }
 
     edges.forEach(e => { if (e.state === 'normal') e.state = 'reject'; });
+    State.steps = State.totalSteps;
     const cost = mst.reduce((s, e) => s + e.w, 0);
     draw();
     showResult(mst, cost);
@@ -304,6 +305,7 @@ const MSTModule = (() => {
     }
 
     edges.forEach(e => { if (e.state === 'normal') e.state = 'reject'; });
+    State.steps = mst.length;  // steps = edges actually added (accurate for Prim)
     const cost = mst.reduce((s, e) => s + e.w, 0);
     draw();
     showResult(mst, cost);
@@ -410,5 +412,5 @@ const MSTModule = (() => {
 
   function init() { resize(); }
 
-  return { init, randomGraph, resetEdges, clearAll, run, setPrimStart };
+  return { init, randomGraph, resetEdges, clearAll, run, setPrimStart, redraw: draw };
 })();
