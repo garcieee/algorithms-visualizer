@@ -1,5 +1,13 @@
 'use strict';
 
+/* ================================================================
+   app.js — Main Application Controller (main_program)
+   Wires together all algorithm modules, handles section switching,
+   nav tabs, header controls, and keyboard shortcuts.
+
+   Depends on: utils.js, sort.js, mst.js, recursion.js
+================================================================ */
+
 document.addEventListener('DOMContentLoaded', () => {
 
   /* ── Algorithm metadata ─────────────────────────────────────── */
@@ -265,6 +273,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   _el('mst-reset-edges')?.addEventListener('click', () => MSTModule.resetEdges());
   _el('mst-clear')?.addEventListener('click', () => MSTModule.clearAll());
+
+  /* ── Compare All button (Sort section only) ─────────────────── */
+  _el('btn-compare-all')?.addEventListener('click', () => {
+    if (State.section === 'sort') SortModule.compareAll();
+  });
+  _el('compare-close')?.addEventListener('click', () => {
+    const overlay = _el('compare-overlay');
+    if (overlay) overlay.style.display = 'none';
+  });
+  // Close overlay by clicking outside the modal
+  _el('compare-overlay')?.addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+  });
 
   /* ── Log clear ──────────────────────────────────────────────── */
   _el('btn-log-clear')?.addEventListener('click', clearLog);

@@ -1,5 +1,15 @@
 'use strict';
 
+/* ================================================================
+   mst.js — Minimum Spanning Tree Module (graph_module)
+   Implements Kruskal's and Prim's algorithms on an interactive
+   canvas graph editor. Uses Union-Find for cycle detection.
+
+   Algorithms: Kruskal's (Union-Find), Prim's (min-heap)
+   Public API: { init, randomGraph, resetEdges, clearAll, run,
+                 setPrimStart, redraw }
+================================================================ */
+
 const MSTModule = (() => {
 
   const canvas = _el('vis-canvas');

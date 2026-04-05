@@ -1,5 +1,15 @@
 'use strict';
 
+/* ================================================================
+   sort.js — Sorting Algorithm Module (sorting_module)
+   Implements 8 sorting algorithms with real-time canvas animation.
+   Also provides synchronous benchmark versions for Compare All.
+
+   Algorithms: Bubble, Selection, Insertion, Merge, Quick,
+               Random-Quick, Counting, Radix
+   Public API: { init, generate, run, redraw, compareAll }
+================================================================ */
+
 const SortModule = (() => {
 
   const canvas = _el('vis-canvas');
@@ -448,6 +458,192 @@ const SortModule = (() => {
     counting: countingSort, radix: radixSort,
   };
 
+  /* ── Synchronous benchmark implementations (no animation) ──── */
+  // These are pure versions of each algorithm used by Compare All.
+  // They return { comps, swaps } without any async/await overhead.
+
+  function _bBubble(a) {
+    let comps = 0, swaps = 0, n = a.length;
+    for (let i = 0; i < n - 1; i++) {
+      let swapped = false;
+      for (let j = 0; j < n - i - 1; j++) {
+        comps++;
+        if (a[j] > a[j + 1]) { [a[j], a[j+1]] = [a[j+1], a[j]]; swaps++; swapped = true; }
+      }
+      if (!swapped) break;
+    }
+    return { comps, swaps };
+  }
+
+  function _bSelection(a) {
+    let comps = 0, swaps = 0;
+    for (let i = 0; i < a.length - 1; i++) {
+      let mi = i;
+      for (let j = i + 1; j < a.length; j++) { comps++; if (a[j] < a[mi]) mi = j; }
+      if (mi !== i) { [a[i], a[mi]] = [a[mi], a[i]]; swaps++; }
+    }
+    return { comps, swaps };
+  }
+
+  function _bInsertion(a) {
+    let comps = 0, swaps = 0;
+    for (let i = 1; i < a.length; i++) {
+      const key = a[i];
+      let j = i - 1;
+      while (j >= 0 && (comps++, a[j] > key)) { a[j + 1] = a[j]; swaps++; j--; }
+      a[j + 1] = key;
+    }
+    return { comps, swaps };
+  }
+
+  function _bMerge(a) {
+    let comps = 0, swaps = 0;
+    function merge(lo, mid, hi) {
+      const L = a.slice(lo, mid + 1), R = a.slice(mid + 1, hi + 1);
+      let i = 0, j = 0, k = lo;
+      while (i < L.length && j < R.length) {
+        comps++;
+        if (L[i] <= R[j]) a[k++] = L[i++]; else { a[k++] = R[j++]; swaps++; }
+      }
+      while (i < L.length) a[k++] = L[i++];
+      while (j < R.length) a[k++] = R[j++];
+    }
+    function sort(lo, hi) {
+      if (lo >= hi) return;
+      const mid = (lo + hi) >> 1;
+      sort(lo, mid); sort(mid + 1, hi); merge(lo, mid, hi);
+    }
+    sort(0, a.length - 1);
+    return { comps, swaps };
+  }
+
+  function _bQuick(a) {
+    let comps = 0, swaps = 0;
+    function partition(lo, hi) {
+      const pivot = a[hi]; let i = lo - 1;
+      for (let j = lo; j < hi; j++) {
+        comps++;
+        if (a[j] <= pivot) { i++; if (i !== j) { [a[i], a[j]] = [a[j], a[i]]; swaps++; } }
+      }
+      [a[i+1], a[hi]] = [a[hi], a[i+1]]; swaps++;
+      return i + 1;
+    }
+    function sort(lo, hi) { if (lo < hi) { const p = partition(lo, hi); sort(lo, p-1); sort(p+1, hi); } }
+    sort(0, a.length - 1);
+    return { comps, swaps };
+  }
+
+  function _bRQuick(a) {
+    let comps = 0, swaps = 0;
+    function partition(lo, hi) {
+      const r = lo + Math.floor(Math.random() * (hi - lo + 1));
+      [a[r], a[hi]] = [a[hi], a[r]]; swaps++;
+      const pivot = a[hi]; let i = lo - 1;
+      for (let j = lo; j < hi; j++) {
+        comps++;
+        if (a[j] <= pivot) { i++; if (i !== j) { [a[i], a[j]] = [a[j], a[i]]; swaps++; } }
+      }
+      [a[i+1], a[hi]] = [a[hi], a[i+1]]; swaps++;
+      return i + 1;
+    }
+    function sort(lo, hi) { if (lo < hi) { const p = partition(lo, hi); sort(lo, p-1); sort(p+1, hi); } }
+    sort(0, a.length - 1);
+    return { comps, swaps };
+  }
+
+  function _bCounting(a) {
+    let comps = 0, swaps = 0;
+    const max = Math.max(...a);
+    const cnt = new Array(max + 1).fill(0);
+    for (let i = 0; i < a.length; i++) { comps++; cnt[a[i]]++; }
+    let k = 0;
+    for (let v = 0; v <= max; v++) while (cnt[v]-- > 0) { a[k++] = v; swaps++; }
+    return { comps, swaps };
+  }
+
+  function _bRadix(a) {
+    let comps = 0, swaps = 0;
+    const max = Math.max(...a);
+    let exp = 1;
+    while (Math.floor(max / exp) > 0) {
+      const buckets = Array.from({ length: 10 }, () => []);
+      for (let i = 0; i < a.length; i++) { comps++; buckets[Math.floor(a[i] / exp) % 10].push(a[i]); }
+      let k = 0;
+      for (const b of buckets) for (const v of b) { a[k++] = v; swaps++; }
+      exp *= 10;
+    }
+    return { comps, swaps };
+  }
+
+  /**
+   * compareAll — Benchmarks all 8 sorting algorithms on the same dataset
+   * and displays a performance comparison table in the overlay panel.
+   */
+  function compareAll() {
+    if (State.running) return;
+    // Use current array or generate a fresh one
+    const dataset = arr.length ? [...arr] : makeDataset(State.size, State.dataset);
+
+    const BENCH = [
+      { label: 'Bubble Sort',       fn: _bBubble },
+      { label: 'Selection Sort',    fn: _bSelection },
+      { label: 'Insertion Sort',    fn: _bInsertion },
+      { label: 'Merge Sort',        fn: _bMerge },
+      { label: 'Quick Sort',        fn: _bQuick },
+      { label: 'Random-Quick Sort', fn: _bRQuick },
+      { label: 'Counting Sort',     fn: _bCounting },
+      { label: 'Radix Sort',        fn: _bRadix },
+    ];
+
+    const results = BENCH.map(b => {
+      const copy = [...dataset];
+      const t0   = performance.now();
+      const { comps, swaps } = b.fn(copy);
+      return { label: b.label, time: performance.now() - t0, comps, swaps };
+    });
+
+    // Show comparison overlay
+    const overlay = document.getElementById('compare-overlay');
+    if (!overlay) return;
+
+    const minTime = Math.min(...results.map(r => r.time));
+    const maxTime = Math.max(...results.map(r => r.time)) || 1;
+    const maxComps = Math.max(...results.map(r => r.comps)) || 1;
+
+    const rows = [...results]
+      .sort((a, b) => a.time - b.time)
+      .map((r, rank) => {
+        const pct     = Math.max(4, (r.time / maxTime) * 100);
+        const compPct = Math.max(4, (r.comps / maxComps) * 100);
+        const isFastest = r.time === minTime;
+        const rowCls = isFastest ? 'cmp-row cmp-best' : 'cmp-row';
+        return `
+          <tr class="${rowCls}">
+            <td class="cmp-rank">${rank + 1}</td>
+            <td class="cmp-name">${r.label}${isFastest ? ' <span class="cmp-badge">fastest</span>' : ''}</td>
+            <td class="cmp-time">${r.time.toFixed(3)}</td>
+            <td class="cmp-bar-cell">
+              <div class="cmp-bar-wrap">
+                <div class="cmp-bar" style="width:${pct.toFixed(1)}%"></div>
+              </div>
+            </td>
+            <td class="cmp-num">${r.comps.toLocaleString()}</td>
+            <td class="cmp-bar-cell">
+              <div class="cmp-bar-wrap">
+                <div class="cmp-bar cmp-bar-comps" style="width:${compPct.toFixed(1)}%"></div>
+              </div>
+            </td>
+            <td class="cmp-num">${r.swaps.toLocaleString()}</td>
+          </tr>`;
+      }).join('');
+
+    document.getElementById('compare-subtitle').textContent =
+      `Dataset size: ${dataset.length}  ·  Type: ${State.dataset}  ·  Results sorted by time`;
+
+    document.getElementById('compare-tbody').innerHTML = rows;
+    overlay.style.display = 'flex';
+  }
+
   /* ── Public API ─────────────────────────────────────────────── */
   function generate() {
     // Called either from switchSection (already cancelled) or button press
@@ -515,5 +711,5 @@ const SortModule = (() => {
     });
   }
 
-  return { init, generate, run, redraw: draw };
+  return { init, generate, run, redraw: draw, compareAll };
 })();

@@ -1,5 +1,15 @@
 'use strict';
 
+/* ================================================================
+   recursion.js — Recursive Function Simulation Module
+   Traces recursive calls with indented text output showing:
+   function calls, base cases, return values, and cache hits.
+
+   Functions: Factorial, Fibonacci (naive + memoized),
+              Tower of Hanoi, GCD (Euclidean), Binary Search
+   Public API: { init, run, reset }
+================================================================ */
+
 const RecModule = (() => {
 
   let isRunning = false;

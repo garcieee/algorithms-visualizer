@@ -140,6 +140,9 @@
         <button class="panel-btn teal" id="panel-generate">Generate</button>
         <button class="panel-btn"      id="panel-reset">Reset</button>
       </div>
+      <div class="panel-btn-row" style="margin-top:6px">
+        <button class="panel-btn panel-btn-full teal-outline" id="btn-compare-all">Compare All Algorithms</button>
+      </div>
     </div>
 
     <!-- MST Settings (hidden by default) -->
@@ -345,6 +348,41 @@
 
   </aside>
 
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     COMPARISON OVERLAY (shown by Compare All button)
+════════════════════════════════════════════════════════════ -->
+<div id="compare-overlay" style="display:none">
+  <div id="compare-modal">
+    <div class="cmp-header">
+      <div>
+        <div class="cmp-title">Sorting Algorithm Performance Comparison</div>
+        <div class="cmp-subtitle" id="compare-subtitle"></div>
+      </div>
+      <button class="cmp-close" id="compare-close">&#x2715;</button>
+    </div>
+    <div class="cmp-table-wrap">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Algorithm</th>
+            <th>Time (ms)</th>
+            <th class="cmp-bar-col">Time (relative)</th>
+            <th>Comparisons</th>
+            <th class="cmp-bar-col">Comps (relative)</th>
+            <th>Swaps</th>
+          </tr>
+        </thead>
+        <tbody id="compare-tbody"></tbody>
+      </table>
+    </div>
+    <div class="cmp-footer">
+      All algorithms run on the <strong>same dataset</strong> without animation for accurate timing.
+      Results may vary slightly between runs due to JS engine optimizations.
+    </div>
+  </div>
 </div>
 
 <script src="utils.js"></script>

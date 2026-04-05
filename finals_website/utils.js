@@ -1,22 +1,44 @@
 'use strict';
 
+/* ================================================================
+   utils.js — Shared utilities, global state, and UI helpers
+   Used by all algorithm modules (sort, mst, recursion).
+================================================================ */
+
 /* ── Utilities ────────────────────────────────────────────────── */
+
+/** Pauses execution for `ms` milliseconds (used for animation delays). */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/** Returns a random integer in the range [a, b] (inclusive). */
 const rand  = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+
+/** Clamps value `v` to the range [lo, hi]. */
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+/**
+ * Formats a large number for compact display in metric cells.
+ * e.g. 1500000 → "1.5M", 2300 → "2.3k", 42 → "42"
+ */
 function fmtNum(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
   if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
   return n.toLocaleString();
 }
 
+/**
+ * Generates a dataset of `n` integers for sorting benchmarks.
+ * @param {number} n      - Number of elements
+ * @param {string} type   - 'random' | 'sorted' | 'reversed' | 'nearly'
+ * @returns {number[]}    - Array of integers in range [2, 100]
+ */
 function makeDataset(n, type = 'random') {
   n = Math.max(2, n);
   if (type === 'random')   return Array.from({ length: n }, () => rand(2, 100));
   if (type === 'sorted')   return Array.from({ length: n }, (_, i) => Math.round(2 + (i / (n - 1)) * 98));
   if (type === 'reversed') return Array.from({ length: n }, (_, i) => Math.round(100 - (i / (n - 1)) * 98));
   if (type === 'nearly') {
+    // Start sorted, then introduce ~8% random swaps (best-case-adjacent input)
     const a = Array.from({ length: n }, (_, i) => Math.round(2 + (i / (n - 1)) * 98));
     const swaps = Math.max(1, Math.floor(n * 0.08));
     for (let k = 0; k < swaps; k++) {
@@ -29,6 +51,10 @@ function makeDataset(n, type = 'random') {
 }
 
 /* ── Global State ─────────────────────────────────────────────── */
+/**
+ * Shared application state accessed by all modules.
+ * Modules read/write this object to coordinate animation flow.
+ */
 const State = {
   section:    'sort',
   algo:       'bubble',
@@ -56,6 +82,11 @@ function resetStats() {
   State.elapsedMs  = 0;
 }
 
+/**
+ * Maps the speed slider value (1–10) to a millisecond delay.
+ * Speed 1 = 600ms/step (very slow), Speed 10 = 0ms (instant).
+ * @returns {number} Delay in milliseconds
+ */
 function speedDelay() {
   const map = { 1:600, 2:250, 3:120, 4:60, 5:28, 6:14, 7:6, 8:3, 9:1, 10:0 };
   return map[clamp(State.speed, 1, 10)] ?? 28;
