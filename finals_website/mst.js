@@ -145,6 +145,7 @@ const MSTModule = (() => {
 
   /* ── Canvas interaction ──────────────────────────────────────── */
   canvas.addEventListener('click', e => {
+    if (State.section !== 'mst') return;
     if (isRunning || State.running) return;
     const rect = canvas.getBoundingClientRect();
     const sx = canvas.width / rect.width;

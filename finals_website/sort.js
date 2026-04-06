@@ -579,8 +579,11 @@ const SortModule = (() => {
    * compareAll — Benchmarks all 8 sorting algorithms on the same dataset
    * and displays a performance comparison table in the overlay panel.
    */
+  let _compareRunning = false;
+
   function compareAll() {
-    if (State.running) return;
+    if (State.running || _compareRunning) return;
+    _compareRunning = true;
     // Use current array or generate a fresh one
     const dataset = arr.length ? [...arr] : makeDataset(State.size, State.dataset);
 
@@ -595,12 +598,25 @@ const SortModule = (() => {
       { label: 'Radix Sort',        fn: _bRadix },
     ];
 
+    // Run each algorithm 5 times and take the minimum time for reliability
+    const TRIALS = 5;
     const results = BENCH.map(b => {
-      const copy = [...dataset];
-      const t0   = performance.now();
-      const { comps, swaps } = b.fn(copy);
-      return { label: b.label, time: performance.now() - t0, comps, swaps };
+      let minTime = Infinity;
+      let comps = 0, swaps = 0;
+      for (let t = 0; t < TRIALS; t++) {
+        const copy = [...dataset];
+        const t0 = performance.now();
+        const res = b.fn(copy);
+        const elapsed = performance.now() - t0;
+        if (elapsed < minTime) {
+          minTime = elapsed;
+          comps = res.comps;
+          swaps = res.swaps;
+        }
+      }
+      return { label: b.label, time: minTime, comps, swaps };
     });
+    _compareRunning = false;
 
     // Show comparison overlay
     const overlay = document.getElementById('compare-overlay');
