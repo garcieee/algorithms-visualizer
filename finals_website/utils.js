@@ -1,24 +1,29 @@
 'use strict';
 
 /* ================================================================
-   utils.js — Shared utilities, global state, and UI helpers
-   Used by all algorithm modules (sort, mst, recursion).
+   utils.js — Shared Utilities, Global State, and UI Helpers
+   Loaded first; every other module depends on these exports.
+
+   Exports (global) : sleep, rand, clamp, fmtNum, makeDataset,
+                      State, resetStats, speedDelay, updateMetrics,
+                      _el, addLog, clearLog, escHtml, setStatus,
+                      setRunBtn, updateComplexity, syncPair
 ================================================================ */
 
-/* ── Utilities ────────────────────────────────────────────────── */
+/* ── Core utilities ───────────────────────────────────────────── */
 
-/** Pauses execution for `ms` milliseconds (used for animation delays). */
+/** Suspends an async function for `ms` milliseconds. */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-/** Returns a random integer in the range [a, b] (inclusive). */
+/** Returns a random integer in [a, b] inclusive. */
 const rand  = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 
-/** Clamps value `v` to the range [lo, hi]. */
+/** Clamps `v` to the closed interval [lo, hi]. */
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /**
- * Formats a large number for compact display in metric cells.
- * e.g. 1500000 → "1.5M", 2300 → "2.3k", 42 → "42"
+ * Formats a large integer for compact display.
+ * Examples: 1_500_000 → "1.5M",  2_300 → "2.3k",  42 → "42"
  */
 function fmtNum(n) {
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
@@ -27,19 +32,21 @@ function fmtNum(n) {
 }
 
 /**
- * Generates a dataset of `n` integers for sorting benchmarks.
- * @param {number} n      - Number of elements
- * @param {string} type   - 'random' | 'sorted' | 'reversed' | 'nearly'
- * @returns {number[]}    - Array of integers in range [2, 100]
+ * Generates an array of `n` integers in [2, 100] for sorting demos.
+ * @param {number} n    - Array length (clamped to ≥ 2)
+ * @param {string} type - 'random' | 'sorted' | 'reversed' | 'nearly'
  */
 function makeDataset(n, type = 'random') {
   n = Math.max(2, n);
-  if (type === 'random')   return Array.from({ length: n }, () => rand(2, 100));
-  if (type === 'sorted')   return Array.from({ length: n }, (_, i) => Math.round(2 + (i / (n - 1)) * 98));
-  if (type === 'reversed') return Array.from({ length: n }, (_, i) => Math.round(100 - (i / (n - 1)) * 98));
+  if (type === 'random')
+    return Array.from({ length: n }, () => rand(2, 100));
+  if (type === 'sorted')
+    return Array.from({ length: n }, (_, i) => Math.round(2 + (i / (n - 1)) * 98));
+  if (type === 'reversed')
+    return Array.from({ length: n }, (_, i) => Math.round(100 - (i / (n - 1)) * 98));
   if (type === 'nearly') {
-    // Start sorted, then introduce ~8% random swaps (best-case-adjacent input)
-    const a = Array.from({ length: n }, (_, i) => Math.round(2 + (i / (n - 1)) * 98));
+    // Nearly-sorted: start fully sorted then swap ~8% of pairs at random
+    const a     = Array.from({ length: n }, (_, i) => Math.round(2 + (i / (n - 1)) * 98));
     const swaps = Math.max(1, Math.floor(n * 0.08));
     for (let k = 0; k < swaps; k++) {
       const i = rand(0, n - 1), j = rand(0, n - 1);
@@ -47,30 +54,28 @@ function makeDataset(n, type = 'random') {
     }
     return a;
   }
-  return Array.from({ length: n }, () => rand(2, 100));
+  return Array.from({ length: n }, () => rand(2, 100)); // fallback → random
 }
 
-/* ── Global State ─────────────────────────────────────────────── */
-/**
- * Shared application state accessed by all modules.
- * Modules read/write this object to coordinate animation flow.
- */
+/* ── Global application state ─────────────────────────────────── */
+// Single source of truth shared across all modules.
+// Modules coordinate animation flow by reading/writing this object.
 const State = {
-  section:    'sort',
-  algo:       'bubble',
-  running:    false,
-  paused:     false,
-  cancel:     false,
-  speed:      5,
-  size:       60,
-  dataset:    'random',
-  comps:      0,
-  swaps:      0,
-  steps:      0,
-  totalSteps: 0,
-  startTime:  0,
-  elapsedMs:  0,
-  vizType:    'bar',  // New: visualization type
+  section:    'sort',    // active section: 'sort' | 'mst' | 'rec'
+  algo:       'bubble',  // active algorithm key
+  running:    false,     // true while an animation is in progress
+  paused:     false,     // true when animation is paused mid-run
+  cancel:     false,     // set to true to abort the current animation
+  speed:      5,         // animation speed 1 (slowest) – 10 (instant)
+  size:       60,        // sort dataset size
+  dataset:    'random',  // dataset type: 'random' | 'sorted' | 'reversed' | 'nearly'
+  comps:      0,         // comparison counter (displayed in metrics)
+  swaps:      0,         // swap/write counter
+  steps:      0,         // steps completed so far
+  totalSteps: 0,         // expected total steps (drives progress bar)
+  startTime:  0,         // performance.now() at animation start (0 when idle)
+  elapsedMs:  0,         // total elapsed ms recorded at animation end
+  vizType:    'bar',     // visualization type: 'bar' | 'line' | 'scatter' | 'bubble' | 'pie'
 };
 
 function resetStats() {
@@ -83,9 +88,8 @@ function resetStats() {
 }
 
 /**
- * Maps the speed slider value (1–10) to a millisecond delay.
- * Speed 1 = 600ms/step (very slow), Speed 10 = 0ms (instant).
- * @returns {number} Delay in milliseconds
+ * Maps the speed slider value (1–10) to a per-step delay in milliseconds.
+ * Speed 1 = 600 ms/step (slowest),  Speed 10 = 0 ms/step (instant).
  */
 function speedDelay() {
   const map = { 1:600, 2:250, 3:120, 4:60, 5:28, 6:14, 7:6, 8:3, 9:1, 10:0 };
@@ -242,6 +246,8 @@ function syncPair(inputId, rangeId, onChange) {
     inp.value = v; rng.value = v;
     if (onChange) onChange(v);
   };
-  inp.addEventListener('input', () => apply(inp.value));
+  // 'change' fires on blur/Enter so the user can finish typing before clamping
+  inp.addEventListener('change', () => apply(inp.value));
+  // range still responds live while dragging
   rng.addEventListener('input', () => apply(rng.value));
 }

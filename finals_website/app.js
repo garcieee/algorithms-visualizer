@@ -1,11 +1,13 @@
 'use strict';
 
 /* ================================================================
-   app.js — Main Application Controller (main_program)
-   Wires together all algorithm modules, handles section switching,
-   nav tabs, header controls, and keyboard shortcuts.
+   app.js — Main Application Controller
+   Bootstraps the app after all modules are loaded. Handles section
+   switching, algorithm selection, header controls, keyboard shortcuts,
+   and wires all panel inputs to global State.
 
-   Depends on: utils.js, sort.js, mst.js, recursion.js
+   Load order: utils.js → visualizations.js → sort.js → mst.js
+               → recursion.js → app.js  (enforced by index.html)
 ================================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
