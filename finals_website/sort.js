@@ -584,8 +584,12 @@ const SortModule = (() => {
   function compareAll() {
     if (State.running || _compareRunning) return;
     _compareRunning = true;
-    // Use current array or generate a fresh one
-    const dataset = arr.length ? [...arr] : makeDataset(State.size, State.dataset);
+
+    // Always benchmark on a large dataset (≥300) so timings are meaningful.
+    // Small arrays finish in < 1 ms and performance.now() resolution makes
+    // the results indistinguishable noise.
+    const BENCH_SIZE = Math.max(300, State.size);
+    const benchDataset = makeDataset(BENCH_SIZE, State.dataset);
 
     const BENCH = [
       { label: 'Bubble Sort',       fn: _bBubble },
@@ -598,23 +602,25 @@ const SortModule = (() => {
       { label: 'Radix Sort',        fn: _bRadix },
     ];
 
-    // Run each algorithm 5 times and take the minimum time for reliability
-    const TRIALS = 5;
+    // Run each algorithm 9 times, drop the 2 fastest and 2 slowest outliers,
+    // then take the mean of the remaining 5 — much more stable than min or mean alone.
+    const TRIALS = 9;
+    const TRIM   = 2;  // drop this many from each tail
     const results = BENCH.map(b => {
-      let minTime = Infinity;
+      const times = [];
       let comps = 0, swaps = 0;
       for (let t = 0; t < TRIALS; t++) {
-        const copy = [...dataset];
+        const copy = [...benchDataset];
         const t0 = performance.now();
         const res = b.fn(copy);
-        const elapsed = performance.now() - t0;
-        if (elapsed < minTime) {
-          minTime = elapsed;
-          comps = res.comps;
-          swaps = res.swaps;
-        }
+        times.push(performance.now() - t0);
+        // record ops from the median-ish middle trial
+        if (t === Math.floor(TRIALS / 2)) { comps = res.comps; swaps = res.swaps; }
       }
-      return { label: b.label, time: minTime, comps, swaps };
+      times.sort((a, b) => a - b);
+      const trimmed = times.slice(TRIM, TRIALS - TRIM);
+      const avgTime = trimmed.reduce((s, v) => s + v, 0) / trimmed.length;
+      return { label: b.label, time: avgTime, comps, swaps };
     });
     _compareRunning = false;
 
@@ -622,16 +628,19 @@ const SortModule = (() => {
     const overlay = document.getElementById('compare-overlay');
     if (!overlay) return;
 
-    const minTime = Math.min(...results.map(r => r.time));
-    const maxTime = Math.max(...results.map(r => r.time)) || 1;
-    const maxComps = Math.max(...results.map(r => r.comps)) || 1;
+    // Sort by time, then by comparisons as a stable tiebreaker
+    const sorted = [...results].sort((a, b) =>
+      a.time !== b.time ? a.time - b.time : a.comps - b.comps
+    );
 
-    const rows = [...results]
-      .sort((a, b) => a.time - b.time)
-      .map((r, rank) => {
+    const maxTime  = sorted[sorted.length - 1].time || 1;
+    const maxComps = Math.max(...sorted.map(r => r.comps)) || 1;
+
+    // Only the single #1 entry gets the "fastest" badge
+    const rows = sorted.map((r, rank) => {
         const pct     = Math.max(4, (r.time / maxTime) * 100);
         const compPct = Math.max(4, (r.comps / maxComps) * 100);
-        const isFastest = r.time === minTime;
+        const isFastest = rank === 0;
         const rowCls = isFastest ? 'cmp-row cmp-best' : 'cmp-row';
         return `
           <tr class="${rowCls}">
@@ -654,7 +663,7 @@ const SortModule = (() => {
       }).join('');
 
     document.getElementById('compare-subtitle').textContent =
-      `Dataset size: ${dataset.length}  ·  Type: ${State.dataset}  ·  Results sorted by time`;
+      `Benchmark size: ${BENCH_SIZE}  ·  Type: ${State.dataset}  ·  9 trials, trimmed mean  ·  Results sorted by time`;
 
     document.getElementById('compare-tbody').innerHTML = rows;
     overlay.style.display = 'flex';
